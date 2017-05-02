@@ -1,0 +1,13 @@
+# Trying to make doubly sure that no IRB protected data gets uploaded
+*.csv
+*.jpg
+*.JPG
+*.png
+*.JPEG
+*.jpeg
+*.hocr
+*.xml
+
+# No MacOS BS
+.DS_Store
+.DS_Store?

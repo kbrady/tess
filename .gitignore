@@ -8,6 +8,7 @@
 *.hocr
 *.xml
 
-# No MacOS BS
+# No MacOS or compiled BS
 .DS_Store
 .DS_Store?
+*.pyc

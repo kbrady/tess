@@ -7,6 +7,8 @@ import imageio
 import os
 # to look in the right places
 import settings
+# to load and save metadata
+import json
 
 class Session:
 	def __init__(self, id_string):
@@ -20,6 +22,14 @@ class Session:
 		self.screen_recording_filename = self.calculate_filenames('Screen_Recordings')
 		self.sensor_data_filename = self.calculate_filenames('Sensor_Data')
 		self.webcam_filename = self.calculate_filenames('Webcam')
+		# load any metadata that exists
+		self.metadata = []
+		if os.path.exists(self.dir_name + os.sep + settings.metadata_file):
+			with open(self.dir_name + os.sep + settings.metadata_file, 'r') as metadata_input:
+				json_str = ' '.join([line for line in metadata_input])
+				# sometimes the program gets interupted before a dump is complete
+				if len(json_str) > 5:
+					self.metadata = json.loads(json_str)
 	
 	def calculate_filenames(self, dir_name):
 		output = []
@@ -99,12 +109,48 @@ class Session:
 			assignments[image_file] = part_of_stimuli
 		return assignments
 
+	def calculate_metadata(self, save_to_file=False):
+		metadata = []
+		assignments = self.assess_stimuli_timestamps()
+		times = assignments.keys()
+		times = [(filename_to_time(t), t) for t in times]
+		times.sort()
+		start_time = None
+		# go through the existing frames in order to find the span of each type of interaction
+		for i in range(len(times)):
+			if i == 0:
+				start_time = times[i][0]
+				continue
+			# record each time span
+			if assignments[times[i-1][1]] != assignments[times[i][1]]:
+				time_span = {}
+				time_span['part'] = assignments[times[i-1][1]]
+				time_span['start_time'] = start_time
+				time_span['end_time'] = times[i-1][0]
+				start_time = times[i][0]
+				metadata.append(time_span)
+		# record the final time span
+		duration = imageio.get_reader(self.screen_recording_filename, 'ffmpeg').get_meta_data()['duration']
+		time_span = {}
+		time_span['part'] = assignments[times[-1][1]]
+		time_span['start_time'] = start_time
+		time_span['end_time'] = duration
+		metadata.append(time_span)
+		# save everything to the metadata file if the save flag is True
+		if save_to_file:
+			with open(self.dir_name + os.sep + settings.metadata_file, 'w') as metadata_output:
+				metadata_output.write(json.dumps(metadata, ensure_ascii=False))
+		# return the calculated metadata
+		return metadata
+
 	def find_transitions(self):
 		assignments = self.assess_stimuli_timestamps()
 		times = assignments.keys()
 		times = [(filename_to_time(t), t) for t in times]
 		times.sort()
+		# go through the existing frames in order to find transitions
 		for i in range(len(times)-1):
+			# do a binary search for every gap that is more than .1 seconds wide
 			if assignments[times[i][1]] != assignments[times[i+1][1]]:
 				if times[i+1][0] - times[i][0] <= .1:
 					continue
@@ -197,17 +243,14 @@ def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant', 'Kate is testing']
+	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+
+	# At some point I need to deal with what happens when there are spaces in the participant name
+	#, 'Kate is testing']
 
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
-		sess.find_transitions()
-		assignments = sess.assess_stimuli_timestamps()
-		keys = assignments.keys()
-		keys.sort()
-		print sess_name
-		for k in keys:
-			print k, assignments[k]
+		sess.calculate_metadata(True)
 
 	# image_path = '/Users/kate/Documents/research/pipeline-data/seventh_participant/frame-images/16-40.jpg'
 	# pic = np.array(misc.imread(image_path))

@@ -75,7 +75,7 @@ class Session:
 	# a function to save time by not running ffmpeg more than necessary
 	def picture_for_frame_exists(self, current_time):
 		# if the directory doesn't exist, neither does any file in it
-		dir_name = self.dir_name + os.sep + 'frame-images'
+		dir_name = self.dir_name + os.sep + settings.frame_images_dir
 		if not os.path.isdir(dir_name):
 			return False
 		# calculate the filename
@@ -92,6 +92,46 @@ class Session:
 			self.screen_time_to_picture(current_time)
 			current_time += 10
 
+	def assess_stimuli_timestamps(self):
+		assignments = {}
+		dir_name = self.dir_name + os.sep + settings.frame_images_dir
+		for image_file in os.listdir(dir_name):
+			part_of_stimuli = figure_out_part_of_stimuli_frame_is_in(dir_name + os.sep + image_file)
+			assignments[image_file] = part_of_stimuli
+		return assignments
+
+def figure_out_part_of_stimuli_frame_is_in(image_path):
+	pic = np.array(misc.imread(image_path))
+	# cut off the top and bottom parts of the frame which show the address bar and the dock
+	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
+	pic = pic[50:800, :900, :]
+	if is_form(pic):
+		return 'form'
+	else:
+		percent_white = image_has_color(pic, rgb=[255, 255, 255])
+		if percent_white > .8:
+			return 'paper or splash page'
+		elif percent_white > .4:
+			return 'digital reading'
+		else:
+			return 'nothing'
+
+def is_form(pic):
+	# only the forms had any purple in them so even a small amount of purple means it's a form
+	if image_has_color(pic, 10, rgb=[237, 230, 246]):
+		return True
+	# sometimes the form side goes white while loading the next question
+	pic_left = pic_left = pic[100:600, :600, :]
+	if not image_has_color(pic_left, rgb=[255, 255, 255]) > .99:
+		return False
+	# the other side should have text
+	# we have already estabilshed that the left side is only white pixels, so 
+	# any non-white pixels on the right side tells us we're looking at a page that isn't all white
+	# thus this must be part of the form
+	pic_right = pic[100:600, 700:, :]
+	percent_white_on_right_side = image_has_color(pic_right, rgb=[255, 255, 255])
+	return percent_white_on_right_side < .98
+
 # this is used for the ffmpeg commands and filenames
 # it ads a 0 before the digit of numbers less than 10
 def num_to_str(num):
@@ -99,10 +139,42 @@ def num_to_str(num):
 		return '0'+str(num)
 	return str(num)
 
+# this is used to identify which part of the webpage a frame belongs to
+# In our studies, the google form pages all had a puruple header which was not present in other pages
+def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=None):
+	# speed things up a little bit by not doing a bunch of &s when we don't have to
+	# this may be useful since the color we are searching for is often white
+	if rgb[0] == rgb[1] and rgb[1] == rgb[2]:
+		num_pixels = sum(sum(sum((pic[:,:,:] == rgb[0]))))
+	else:
+		num_pixels = sum(sum((pic[:,:,0] == rgb[0]) & (pic[:,:,1] == rgb[1]) & (pic[:,:,2] == rgb[2])))
+	# if no threashold is given return the percentage of pixels that had the specified color
+	if threashold is None:
+		height, width, depth = pic.shape
+		return float(num_pixels)/(height*width)
+	# otherwise return a binary value based on the threasholds
+	if upper_threashold is None:
+		return num_pixels > threashold
+	else:
+		return (num_pixels > threashold) and (num_pixels < upper_threashold)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant', 'Kate is testing']
 
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
-		sess.break_into_10_second_chunks()
+		assignments = sess.assess_stimuli_timestamps()
+		keys = assignments.keys()
+		keys.sort()
+		print sess_name
+		for k in keys:
+			print k, assignments[k]
+
+	# image_path = '/Users/kate/Documents/research/pipeline-data/Amanda/frame-images/10-50.jpg'
+	# pic = np.array(misc.imread(image_path))
+	# # cut off the top and bottom parts of the frame which show the address bar and the dock
+	# # cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
+	# pic = pic[50:800, :900, :]
+	# print is_form(pic)
+

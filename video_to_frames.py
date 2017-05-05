@@ -60,12 +60,12 @@ class Session:
 		dir_name = self.dir_name + os.sep + 'frame-images'
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
-		# calculate the minutes and seconds of the time and use these values to create the filename
-		minutes = int(current_time/60)
-		seconds = current_time - (minutes * 60)
-		filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
+		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
 		command = 'ffmpeg -ss 00:'
+		# calculate the minutes and seconds of the time
+		minutes = int(current_time/60)
+		seconds = current_time - (minutes * 60)
 		command += num_to_str(minutes)+':'+num_to_str(seconds)
 		command += ' -i '+self.screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
 		command = command.replace('(','\(')
@@ -78,10 +78,7 @@ class Session:
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
 		if not os.path.isdir(dir_name):
 			return False
-		# calculate the filename
-		minutes = int(current_time/60)
-		seconds = current_time - (minutes * 60)
-		filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
+		filename = time_to_filename(current_time)
 		return os.path.exists(dir_name + os.sep + filename)
 	
 	def break_into_10_second_chunks(self):
@@ -92,13 +89,58 @@ class Session:
 			self.screen_time_to_picture(current_time)
 			current_time += 10
 
-	def assess_stimuli_timestamps(self):
+	def assess_stimuli_timestamps(self, file_list=None):
 		assignments = {}
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
-		for image_file in os.listdir(dir_name):
+		if file_list is None:
+			file_list = os.listdir(dir_name)
+		for image_file in file_list:
 			part_of_stimuli = figure_out_part_of_stimuli_frame_is_in(dir_name + os.sep + image_file)
 			assignments[image_file] = part_of_stimuli
 		return assignments
+
+	def find_transitions(self):
+		assignments = self.assess_stimuli_timestamps()
+		times = assignments.keys()
+		times = [(filename_to_time(t), t) for t in times]
+		times.sort()
+		for i in range(len(times)-1):
+			if assignments[times[i][1]] != assignments[times[i+1][1]]:
+				if times[i+1][0] - times[i][0] <= .1:
+					continue
+				self.binary_frame_search(times[i][0], times[i+1][0], assignments[times[i][1]], assignments[times[i+1][1]])
+
+	def binary_frame_search(self, start_time, end_time, start_value, end_value, key=lambda x, y: x == y):
+		if start_time > end_time or end_time - start_time <= .15:
+			return
+		if key(start_value, end_value):
+			return
+		middle_time = float(int((float(start_time + end_time)/2)*10))/10
+		# might not actually get a middle time due to round off error
+		if middle_time == start_time or middle_time == end_time:
+			return
+		#print (time_to_filename(start_time), time_to_filename(middle_time), time_to_filename(end_time))
+		middle_filename = time_to_filename(middle_time)
+		self.screen_time_to_picture(middle_time)
+		middle_value = self.assess_stimuli_timestamps(file_list=[middle_filename])[middle_filename]
+		self.binary_frame_search(start_time, middle_time, start_value, middle_value, key=key)
+		self.binary_frame_search(middle_time, end_time, middle_value, end_value, key=key)
+
+def time_to_filename(current_time):
+	# calculate the minutes and seconds of the time and use these values to create the filename
+	minutes = int(current_time/60)
+	seconds = current_time - (minutes * 60)
+	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
+	return filename
+
+def filename_to_time(filename):
+	parts = filename.split('.')
+	minutes, seconds = [int(x) for x in parts[0].split('-')]
+	if len(parts) > 2:
+		miliseconds = float('.'+parts[1])
+	else:
+		miliseconds = 0
+	return minutes * 60 + seconds + miliseconds
 
 def figure_out_part_of_stimuli_frame_is_in(image_path):
 	pic = np.array(misc.imread(image_path))
@@ -142,12 +184,7 @@ def num_to_str(num):
 # this is used to identify which part of the webpage a frame belongs to
 # In our studies, the google form pages all had a puruple header which was not present in other pages
 def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=None):
-	# speed things up a little bit by not doing a bunch of &s when we don't have to
-	# this may be useful since the color we are searching for is often white
-	if rgb[0] == rgb[1] and rgb[1] == rgb[2]:
-		num_pixels = sum(sum(sum((pic[:,:,:] == rgb[0]))))
-	else:
-		num_pixels = sum(sum((pic[:,:,0] == rgb[0]) & (pic[:,:,1] == rgb[1]) & (pic[:,:,2] == rgb[2])))
+	num_pixels = sum(sum((pic[:,:,0] == rgb[0]) & (pic[:,:,1] == rgb[1]) & (pic[:,:,2] == rgb[2])))
 	# if no threashold is given return the percentage of pixels that had the specified color
 	if threashold is None:
 		height, width, depth = pic.shape
@@ -164,6 +201,7 @@ if __name__ == '__main__':
 
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
+		sess.find_transitions()
 		assignments = sess.assess_stimuli_timestamps()
 		keys = assignments.keys()
 		keys.sort()
@@ -171,10 +209,10 @@ if __name__ == '__main__':
 		for k in keys:
 			print k, assignments[k]
 
-	# image_path = '/Users/kate/Documents/research/pipeline-data/Amanda/frame-images/10-50.jpg'
+	# image_path = '/Users/kate/Documents/research/pipeline-data/seventh_participant/frame-images/16-40.jpg'
 	# pic = np.array(misc.imread(image_path))
 	# # cut off the top and bottom parts of the frame which show the address bar and the dock
 	# # cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
 	# pic = pic[50:800, :900, :]
-	# print is_form(pic)
+	# print image_has_color(pic, rgb=[255, 255, 255])
 

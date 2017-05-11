@@ -109,6 +109,46 @@ class Session:
 			assignments[image_file] = part_of_stimuli
 		return assignments
 
+	# the reading is the same if the pixels for the first line are the same and the sidebar is in the same position
+	def find_digital_reading_transitions(self):
+		if len(self.metadata) == 0:
+			self.metadata = self.calculate_metadata(save_to_file=True)
+		digital_reading_times = [x for x in self.metadata if x['part'] == 'digital reading']
+		dir_name = self.dir_name + os.sep + settings.frame_images_dir
+		picture_value = lambda filename: get_part_of_picture(dir_name + os.sep + filename, x_range=[0, 1400], y_range=[600,700])
+		for reading_interval in digital_reading_times:
+			filenames = self.get_image_filenames_in_timespan(reading_interval['start_time'], reading_interval['end_time'])
+			for i in range(len(filenames)-1):
+				start_value = picture_value(filenames[i])
+				end_value = picture_value(filenames[i+1])
+				if not (start_value == end_value).all():
+					start_time = filename_to_time(filenames[i])
+					end_time = filename_to_time(filenames[i+1])
+					if end_time - start_time > .1:
+						self.binary_frame_search(start_time, end_time, start_value, end_value, value_fun=picture_value)
+			# now that we have made sure we have all the necessary files, look for the transitions
+			filenames = self.get_image_filenames_in_timespan(reading_interval['start_time'], reading_interval['end_time'])
+			transition_list = [filename_to_time(filenames[0])]
+			for i in range(len(filenames)-1):
+				start_value = picture_value(filenames[i])
+				end_value = picture_value(filenames[i+1])
+				if not (start_value == end_value).all():
+					transition_list.append(filename_to_time(filenames[i+1]))
+			reading_interval['transitions'] = transition_list
+		with open(self.dir_name + os.sep + settings.metadata_file, 'w') as metadata_output:
+			metadata_output.write(json.dumps(self.metadata, ensure_ascii=False))
+
+
+	# get all frame images which have been taken in a given time span
+	def get_image_filenames_in_timespan(self, start_time, end_time):
+		output = []
+		for filename in os.listdir(self.dir_name + os.sep + settings.frame_images_dir):
+			time = filename_to_time(filename)
+			if start_time <= time and time <= end_time:
+				output.append(filename)
+		output.sort(key = lambda x: filename_to_time(x))
+		return output
+
 	def calculate_metadata(self, save_to_file=False):
 		metadata = []
 		assignments = self.assess_stimuli_timestamps()
@@ -156,9 +196,13 @@ class Session:
 					continue
 				self.binary_frame_search(times[i][0], times[i+1][0], assignments[times[i][1]], assignments[times[i+1][1]])
 
-	def binary_frame_search(self, start_time, end_time, start_value, end_value, key=lambda x, y: x == y):
+	def binary_frame_search(self, start_time, end_time, start_value, end_value, value_fun=lambda x: self.assess_stimuli_timestamps(file_list=[x])[x]):
 		if start_time > end_time or end_time - start_time <= .15:
 			return
+		if type(start_time) == str:
+			key = lambda x, y: x == y
+		else:
+			key = lambda x, y: (x == y).all()
 		if key(start_value, end_value):
 			return
 		middle_time = float(int((float(start_time + end_time)/2)*10))/10
@@ -168,9 +212,9 @@ class Session:
 		#print (time_to_filename(start_time), time_to_filename(middle_time), time_to_filename(end_time))
 		middle_filename = time_to_filename(middle_time)
 		self.screen_time_to_picture(middle_time)
-		middle_value = self.assess_stimuli_timestamps(file_list=[middle_filename])[middle_filename]
-		self.binary_frame_search(start_time, middle_time, start_value, middle_value, key=key)
-		self.binary_frame_search(middle_time, end_time, middle_value, end_value, key=key)
+		middle_value = value_fun(middle_filename)
+		self.binary_frame_search(start_time, middle_time, start_value, middle_value, value_fun=value_fun)
+		self.binary_frame_search(middle_time, end_time, middle_value, end_value, value_fun=value_fun)
 
 def time_to_filename(current_time):
 	# calculate the minutes and seconds of the time and use these values to create the filename
@@ -203,6 +247,13 @@ def figure_out_part_of_stimuli_frame_is_in(image_path):
 			return 'digital reading'
 		else:
 			return 'nothing'
+
+def get_part_of_picture(image_path, x_range, y_range):
+	pic = np.array(misc.imread(image_path))
+	# cut off the top and bottom parts of the frame which show the address bar and the dock
+	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
+	pic = pic[y_range[0]:y_range[1], x_range[0]:x_range[1], :]
+	return pic
 
 def is_form(pic):
 	# only the forms had any purple in them so even a small amount of purple means it's a form
@@ -250,7 +301,7 @@ if __name__ == '__main__':
 
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
-		sess.calculate_metadata(True)
+		sess.find_digital_reading_transitions()
 
 	# image_path = '/Users/kate/Documents/research/pipeline-data/seventh_participant/frame-images/16-40.jpg'
 	# pic = np.array(misc.imread(image_path))

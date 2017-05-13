@@ -21,10 +21,26 @@ def make_ocr_ready_images(sess):
 			full_path_for_new_image = dir_for_bigger_images + os.sep + filename
 			misc.imsave(full_path_for_new_image, bigger_pic)
 
+def run_tesseract(sess):
+	digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
+	for reading_interval in digital_reading_times:
+		for image_time in reading_interval['transitions']:
+			filename = video_to_frames.time_to_filename(image_time)
+			image_dir = sess.dir_name + os.sep + settings.images_ready_for_ocr
+			image_path = image_dir + os.sep + filename
+			hocr_dir = sess.dir_name + os.sep + settings.hocr_dir
+			if not os.path.isdir(hocr_dir):
+				os.mkdir(hocr_dir)
+			hocr_path = hocr_dir + os.sep + '.'.join(filename.split('.')[:-1])
+			command = 'tesseract '+image_path+' '+hocr_path+' -l eng hocr'
+			print command
+			os.system(command)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
 
 	for sess_name in pilot_sessions:
 		sess = video_to_frames.Session(sess_name)
-		make_ocr_ready_images(sess)
+		run_tesseract(sess)
+

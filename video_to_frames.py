@@ -80,6 +80,7 @@ class Session:
 		command += ' -i '+self.screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
 		command = command.replace('(','\(')
 		command = command.replace(')','\)')
+		command = command.replace(' ','\ ')
 		os.system(command)
 
 	# a function to save time by not running ffmpeg more than necessary

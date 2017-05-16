@@ -12,6 +12,8 @@ import xml.etree.cElementTree as ET
 from collections import Counter
 # to convert characters to ascii
 import unicodedata
+# to measure how long each session is taking
+import time
 
 # to handle unicode characters that unicodedata doesn't catch
 Replacement_Dict = {u'\u2014':'-'}
@@ -24,15 +26,18 @@ def replace_unicode(text):
 # a class to store, interpret and scale bounding boxes
 class BBox:
 	def __init__(self, info):
-		if type(info) == str:
+		if type(info) == str or type(info) == unicode:
 			info = [int(x) for x in info.split(' ')]
-		self.top = info[1]
-		self.bottom = info[3]
-		self.right = info[0]
-		self.left = info[2]
+		try:
+			self.right, self.top, self.left, self.bottom = info
+		except Exception as e:
+			print type(info)
+			print info
+			raise e
+		self.str_rep = ' '.join([str(x) for x in info])
 
 	def __str__(self):
-		return str([self.right, self.top, self.left, self.bottom])
+		return self.str_rep
 
 # A parent object for lines and words which defines some shared functionality
 class Part(object):
@@ -76,6 +81,7 @@ class Word(Part):
 			self.et = ET.SubElement(et_parent, "word", bbox=str(self.bbox))
 		else:
 			self.et = ET.Element("word", bbox=str(self.bbox))
+		self.et.text = self.text
 
 	def __repr__(self):
 		if self.corrected_text is not None:
@@ -109,29 +115,79 @@ class Line(Part):
 # An object to interpret hocr files
 class Document:
 	def __init__(self, tesseract_file):
+		# save the location of the original file
+		self.tesseract_file = tesseract_file
+		if not tesseract_file.endswith('.hocr'):
+			raise Exception(tesseract_file+' is not of type .hocr')
+		# save the locaiton where corrected files will be saved to
+		xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		if not os.path.isdir(xml_dir):
+			os.mkdir(xml_dir)
+		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
+		# make a root to build the xml for the corrected file
 		self.root = ET.Element("root")
+		# open the hocr file and read in the output from tesseract
 		with open(tesseract_file, 'r') as input_file:
 			data = ' '.join([line for line in input_file])
 			soup = BeautifulSoup(data, "html.parser")
 			tag_list = soup.find_all('span', {'class':'ocr_line'})
 			self.lines = [Line(t, self.root) for t in tag_list]
+		self.correct_lines = []
 
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])
 
+	def find_correct(self, correct_bags=None):
+		bag_of_lines = [str(l) for l in self.lines]
+		for correct_filename in correct_bags:
+			num_same = len(set(correct_bags[correct_filename]) & set(bag_of_lines))
+			perc_same = float(num_same)/len(bag_of_lines)
+			# may need to work on cuttoff
+			if perc_same > .5:
+				self.assign_correct_bag(correct_filename, correct_bags[correct_filename])
+				return correct_filename, correct_bags[correct_filename]
+		raise Exception('Could not find file match for '+self.tesseract_file)
+
+	def assign_correct_bag(self, correct_filename, correct_lines):
+		self.root.set('filename', correct_filename)
+		self.correct_lines = correct_lines
+
+	def save(self):
+		tree = ET.ElementTree(self.root)
+		tree.write(self.xml_file)
+
+# get lists of the lines in each correct file
+def get_correct_bags():
+	correct_bags = {}
+	for filename in os.listdir('correct_text'):
+		filepath = 'correct_text' + os.sep + filename
+		with open(filepath, 'r') as input_file:
+			correct_bags[filename] = [l.strip() for l in input_file]
+	return correct_bags
+
 # A function to clean up all the hocr files for a session
 def cleanup(sess):
+	correct_bags = get_correct_bags()
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
+	correct_filename = None
+	correct_lines = None
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
 		document = Document(filepath)
-		print filepath
+		if correct_filename is None:
+			correct_filename, correct_lines = document.find_correct(correct_bags)
+		else:
+			document.assign_correct_bag(correct_filename, correct_lines)
+		document.save()
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
 
+	t0 = time.time()
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
 		cleanup(sess)
 		break
+	t1 = time.time()
+	print 'time taken', t1 - t0

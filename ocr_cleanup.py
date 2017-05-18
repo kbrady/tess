@@ -171,9 +171,14 @@ class Document:
 			num_same = len(set(correct_bags[correct_filename]) & set(bag_of_lines))
 			perc_same = float(num_same)/len(bag_of_lines)
 			# may need to work on cuttoff
-			if perc_same > .5:
+			if perc_same > .1:
 				self.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 				return correct_filename, correct_bags[correct_filename]
+		print str(self)
+		for correct_filename in correct_bags:
+			num_same = len(set(correct_bags[correct_filename]) & set(bag_of_lines))
+			perc_same = float(num_same)/len(bag_of_lines)
+			print perc_same
 		raise Exception('Could not find file match for '+self.tesseract_file)
 
 	def assign_correct_bag(self, correct_filename, correct_lines):
@@ -216,7 +221,7 @@ class Document:
 				blank_lines.append(self.lines[i])
 				continue
 			correct_line_index = self.find_line_to_assign(correct_lines, i)
-			if correct_line_index is None:
+			if correct_line_index is None or correct_line_index >= len(self.correct_lines):
 				blank_lines.append(self.lines[i])
 				continue
 			distance = self.lines[i].levenshteinDistance(self.correct_lines[correct_line_index])
@@ -362,6 +367,9 @@ def cleanup(sess):
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
 	correct_filename = None
 	correct_lines = None
+	# don't bother with sessions which don't have any hocr files
+	if not os.path.isdir(dir_name):
+		return
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
 		document = Document(filepath)
@@ -376,6 +384,7 @@ def cleanup(sess):
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+	pilot_sessions = ['eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
 
 	t0 = time.time()
 	for sess_name in pilot_sessions:

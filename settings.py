@@ -8,3 +8,4 @@ hocr_dir = 'hocr-files'
 xml_dir = 'xml-files'
 digital_reading_x_range = [200, 1200]
 digital_reading_y_range = [40, 860]
+eye_tracking_word_csv_file = 'eye_tracking.csv'

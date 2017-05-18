@@ -158,6 +158,10 @@ class Document:
 		self.root.set('filename', correct_filename)
 		self.correct_lines = correct_lines
 
+	def remove_line(self, line):
+		self.lines.remove(line)
+		self.root.remove(line.et)
+
 	def assign_lines(self):
 		if len(self.correct_lines) == 0:
 			raise RuntimeError('Need to assign correct lines to document')
@@ -178,23 +182,29 @@ class Document:
 		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
 		right_dimensions = Dimensions(min(right_points), max(right_points), np.std(right_points))
 		left_dimensions = Dimensions(min(left_points), max(left_points), np.std(left_points))
+		# make a list of lines to delete and delete them after assigning the rest of the lines
+		# (so as not to change the indices)
+		blank_lines = []
 		# fill in missing lines (for the moment assume no mistakes with the last step)
 		for i in range(len(bag_of_lines)):
 			if correct_lines[i] != -1:
 				continue
 			# reject lines which are beyond a standard deviation outside the right and left endpoints of correct lines
 			if not valid_line(self.lines[i].bbox, right_dimensions, left_dimensions):
-				self.lines[i].assign_matching('')
+				blank_lines.append(self.lines[i])
 				continue
 			correct_line_index = self.find_line_to_assign(correct_lines, i)
 			if correct_line_index is None:
-				self.lines[i].assign_matching('')
+				blank_lines.append(self.lines[i])
 				continue
 			distance = self.lines[i].levenshteinDistance(self.correct_lines[correct_line_index])
 			if distance < (len(self.correct_lines[correct_line_index]) * .5):
 				self.lines[i].assign_matching(self.correct_lines[correct_line_index])
 			else:
-				self.lines[i].assign_matching('')
+				blank_lines.append(self.lines[i])
+		# remove lines which were not matched
+		for l in blank_lines:
+			self.remove_line(l)
 
 	def find_line_to_assign(self, correct_lines, index, forward=True):
 		iterator = 1 if forward else -1

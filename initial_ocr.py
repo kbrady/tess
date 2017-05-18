@@ -13,7 +13,7 @@ def make_ocr_ready_images(sess):
 		for image_time in reading_interval['transitions']:
 			filename = video_to_frames.time_to_filename(image_time)
 			full_path = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + filename
-			pic = video_to_frames.get_part_of_picture(full_path, x_range=[200, 1200], y_range=[40, 860])
+			pic = video_to_frames.get_part_of_picture(full_path, x_range=settings.digital_reading_x_range, y_range=settings.digital_reading_y_range)
 			bigger_pic = ndimage.zoom(pic, (2, 2, 1), order=0)
 			dir_for_bigger_images = sess.dir_name + os.sep + settings.images_ready_for_ocr
 			if not os.path.isdir(dir_for_bigger_images):

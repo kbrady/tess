@@ -36,10 +36,22 @@ class BBox:
 			print type(info)
 			print info
 			raise e
-		self.str_rep = ' '.join([str(x) for x in info])
 
 	def __str__(self):
-		return self.str_rep
+		return ' '.join([str(x) for x in [self.right, self.top, self.left, self.bottom]])
+
+	def scale(self, right_shift, down_shift, multiple):
+		# stretch by multiple
+		self.right *= multiple
+		self.left *= multiple
+		self.top *= multiple
+		self.bottom *= multiple
+		# shift right and left by right_shift
+		self.right += right_shift
+		self.left += right_shift
+		# shift top and bottom by down shift
+		self.top += down_shift
+		self.bottom += down_shift
 
 # A parent object for lines and words which defines some shared functionality
 class Part(object):
@@ -94,6 +106,10 @@ class Word(Part):
 		self.corrected_text = text
 		self.et.text = text
 
+	def scale(self, right_shift, down_shift, multiple):
+		self.bbox.scale(right_shift, down_shift, multiple)
+		self.et.set('bbox', str(self.bbox))
+
 # An object to interpret lines in hocr files
 class Line(Part):
 	def __init__(self, tag, et_parent=None):
@@ -117,6 +133,12 @@ class Line(Part):
 		else:
 			for word in self.children:
 				word.assign_matching('')
+
+	def scale(self, right_shift, down_shift, multiple):
+		self.bbox.scale(right_shift, down_shift, multiple)
+		self.et.set('bbox', str(self.bbox))
+		for word in self.children:
+			word.scale(right_shift, down_shift, multiple)
 
 # An object to interpret hocr files
 class Document:
@@ -227,6 +249,10 @@ class Document:
 				print str(self)
 				print set([str(l) for l in self.lines]) & set(self.correct_lines)
 				raise Exception('No totally correct lines found')
+
+	def scale(self, right_shift, down_shift, multiple):
+		for l in self.lines:
+			l.scale(right_shift, down_shift, multiple)
 
 	def save(self):
 		tree = ET.ElementTree(self.root)
@@ -344,6 +370,7 @@ def cleanup(sess):
 		else:
 			document.assign_correct_bag(correct_filename, correct_lines)
 		document.assign_lines()
+		document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
 		document.save()
 
 if __name__ == '__main__':
@@ -354,6 +381,5 @@ if __name__ == '__main__':
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
 		cleanup(sess)
-		break
 	t1 = time.time()
 	print 'time taken', t1 - t0

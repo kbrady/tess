@@ -6,3 +6,5 @@ metadata_file = 'metadata.json'
 images_ready_for_ocr = 'resized-images'
 hocr_dir = 'hocr-files'
 xml_dir = 'xml-files'
+digital_reading_x_range = [200, 1200]
+digital_reading_y_range = [40, 860]

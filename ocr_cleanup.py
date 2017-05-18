@@ -8,12 +8,14 @@ from video_to_frames import Session
 from bs4 import BeautifulSoup
 # to write corrected output to file
 import xml.etree.cElementTree as ET
-# to make word frequency vectors
-from collections import Counter
+# to make word frequency vectors and store dimensions
+from collections import Counter, namedtuple
 # to convert characters to ascii
 import unicodedata
 # to measure how long each session is taking
 import time
+# to calculate the standard deviation of dimensions
+import numpy as np
 
 # to handle unicode characters that unicodedata doesn't catch
 Replacement_Dict = {u'\u2014':'-'}
@@ -168,9 +170,21 @@ class Document:
 			if bag_of_lines[i] in self.correct_lines:
 				corrected_line_index = self.correct_lines.index(bag_of_lines[i])
 				correct_lines[i] = corrected_line_index
+		# find the minimum, maximum and std of currect lines
+		# (we will use this to determine if incorrect lines should be included)
+		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if correct_lines[i] != -1]
+		right_points = [l.bbox.right for l in totally_correct_lines]
+		left_points = [l.bbox.left for l in totally_correct_lines]
+		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
+		right_dimensions = Dimensions(min(right_points), max(right_points), np.std(right_points))
+		left_dimensions = Dimensions(min(left_points), max(left_points), np.std(left_points))
 		# fill in missing lines (for the moment assume no mistakes with the last step)
 		for i in range(len(bag_of_lines)):
 			if correct_lines[i] != -1:
+				continue
+			# reject lines which are beyond a standard deviation outside the right and left endpoints of correct lines
+			if not valid_line(self.lines[i].bbox, right_dimensions, left_dimensions):
+				self.lines[i].assign_matching('')
 				continue
 			correct_line_index = self.find_line_to_assign(correct_lines, i)
 			if correct_line_index is None:
@@ -207,6 +221,12 @@ class Document:
 	def save(self):
 		tree = ET.ElementTree(self.root)
 		tree.write(self.xml_file)
+
+# to determine if a line is outside the bounds of known lines
+def valid_line(bbox, right_dimensions, left_dimensions):
+	def in_bounds(val, dim):
+		return val <= (dim.max + dim.std) and val >= (dim.min - dim.std)
+	return in_bounds(bbox.right, right_dimensions) and in_bounds(bbox.left, left_dimensions)
 
 # to match words which were incorrect
 def assign(set_to_assign, all_strings, complete_coverage=False):

@@ -22,5 +22,8 @@ Questions:
 
 Initially I am assuming that we have a text file for the stimuli with the correct line breaks and that students don't resize the web page during the experiment.
 
+### pair_screen_with_eyes.py
+.xml files -> .csv file with the distances from the x and y observed by the eye tracker to the words in the document (as displayed on the screen).
+
 ### visualize_single_page.py
 Make a video of a student reading a page a web page with the scrolling taken out (maybe have a sidebar showing where the current window is)

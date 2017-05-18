@@ -76,7 +76,7 @@ class Document:
 		with open(self.correct_filepath, 'r') as word_file:
 			for line in word_file:
 				line = line.strip()
-				if line not in list_of_line_strings:
+				if x == -1 or y == -1 or line not in list_of_line_strings:
 					list_of_distances += [None] * len(line.split(' '))
 					continue
 				line_index = list_of_line_strings.index(line)

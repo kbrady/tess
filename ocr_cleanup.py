@@ -196,36 +196,50 @@ class Document:
 		# start by finding the exact matches
 		# currently we expect there to be a lot of these. This might not hold up in the future
 		# other methods may be needed
-		correct_lines = [-1] * len(bag_of_lines)
+		line_assignments = [-1] * len(bag_of_lines)
 		for i in range(len(bag_of_lines)):
 			if bag_of_lines[i] in self.correct_lines:
 				corrected_line_index = self.correct_lines.index(bag_of_lines[i])
-				correct_lines[i] = corrected_line_index
+				line_assignments[i] = corrected_line_index
 		# find the minimum, maximum and std of currect lines
 		# (we will use this to determine if incorrect lines should be included)
-		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if correct_lines[i] != -1]
+		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		right_points = [l.bbox.right for l in totally_correct_lines]
 		left_points = [l.bbox.left for l in totally_correct_lines]
 		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
-		right_dimensions = Dimensions(min(right_points), max(right_points), np.std(right_points))
-		left_dimensions = Dimensions(min(left_points), max(left_points), np.std(left_points))
+		right_dimensions = Dimensions(min(right_points), max(right_points), reasonable_deviation(right_points, left_points))
+		left_dimensions = Dimensions(min(left_points), max(left_points), reasonable_deviation(left_points, right_points))
 		# make a list of lines to delete and delete them after assigning the rest of the lines
 		# (so as not to change the indices)
 		blank_lines = []
 		# fill in missing lines (for the moment assume no mistakes with the last step)
 		for i in range(len(bag_of_lines)):
-			if correct_lines[i] != -1:
+			if line_assignments[i] != -1:
 				continue
 			# reject lines which are beyond a standard deviation outside the right and left endpoints of correct lines
 			if not valid_line(self.lines[i].bbox, right_dimensions, left_dimensions):
 				blank_lines.append(self.lines[i])
 				continue
-			correct_line_index = self.find_line_to_assign(correct_lines, i)
-			if correct_line_index is None or correct_line_index >= len(self.correct_lines):
+			# find the candidates for the correct line and look through them for the best match
+			low_index, high_index = self.find_line_to_assign(line_assignments, i)
+			distance = 1.0
+			correct_line_index = None
+			# look through candidates for the most likely match
+			# make sure indexes stay within the bounds of self.correct_lines
+			# you will need to add 1 to high_index so the loop will work when high_index == low_index
+			for line_index in range(max(low_index, 0), min(high_index+1, len(self.correct_lines))):
+				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index])
+				if d < distance:
+					distance = d
+					correct_line_index = line_index
+			# if a good candidate couldn't be found, blank the line
+			if correct_line_index is None:
 				blank_lines.append(self.lines[i])
 				continue
-			distance = self.lines[i].levenshteinDistance(self.correct_lines[correct_line_index])
-			if distance < (len(self.correct_lines[correct_line_index]) * .5):
+			# less than 50% of the line needs to be changed (and it is less than 50% away from the correct line)
+			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
+			# short lines with lots of numbers
+			if distance < .5:
 				self.lines[i].assign_matching(self.correct_lines[correct_line_index])
 			else:
 				blank_lines.append(self.lines[i])
@@ -233,22 +247,25 @@ class Document:
 		for l in blank_lines:
 			self.remove_line(l)
 
-	def find_line_to_assign(self, correct_lines, index, forward=True):
+	def find_line_to_assign(self, line_assignments, index, forward=True):
 		iterator = 1 if forward else -1
 		next_found_index = index+iterator
-		while next_found_index < len(correct_lines) and next_found_index >= 0 and correct_lines[next_found_index] == -1:
+		while next_found_index < len(line_assignments) and next_found_index >= 0 and line_assignments[next_found_index] == -1:
 			next_found_index += iterator
 		if next_found_index >= 0 and next_found_index < len(self.lines):
-			correct_index = correct_lines[next_found_index] - (next_found_index-index)
-			if correct_index > 0:
-				return correct_index
+			# range of indexes to check
+			perfect_coverage_index = line_assignments[next_found_index] - (next_found_index-index)
+			no_coverage_index = line_assignments[next_found_index] - iterator
+			# put the higher number first to make them easier to assign
+			if perfect_coverage_index > no_coverage_index:
+				return no_coverage_index, perfect_coverage_index
 			else:
-				return None
+				return perfect_coverage_index, no_coverage_index
 		else:
 			if forward:
-				return self.find_line_to_assign(correct_lines, index, forward=False)
+				return self.find_line_to_assign(line_assignments, index, forward=False)
 			else:
-				print correct_lines
+				print line_assignments
 				print self.tesseract_file
 				print self.correct_lines
 				print str(self)
@@ -262,6 +279,12 @@ class Document:
 	def save(self):
 		tree = ET.ElementTree(self.root)
 		tree.write(self.xml_file)
+
+# If the standard deviation is too small, we shouldn't use it
+def reasonable_deviation(list_of_numbers, second_list):
+	min_val = min(list_of_numbers + second_list)
+	max_val = max(list_of_numbers + second_list)
+	return float(max_val - min_val)/4
 
 # to determine if a line is outside the bounds of known lines
 def valid_line(bbox, right_dimensions, left_dimensions):
@@ -361,6 +384,17 @@ def get_correct_bags():
 			correct_bags[filename] = [l.strip() for l in input_file]
 	return correct_bags
 
+def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_bags=None):
+	document = Document(filepath)
+	if correct_filename is None:
+		correct_filename, correct_lines = document.find_correct(correct_bags)
+	else:
+		document.assign_correct_bag(correct_filename, correct_lines)
+	document.assign_lines()
+	document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
+	document.save()
+	return correct_filename, correct_lines
+
 # A function to clean up all the hocr files for a session
 def cleanup(sess):
 	correct_bags = get_correct_bags()
@@ -372,23 +406,20 @@ def cleanup(sess):
 		return
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
-		document = Document(filepath)
 		if correct_filename is None:
-			correct_filename, correct_lines = document.find_correct(correct_bags)
+			correct_filename, correct_lines = cleanup_file(filepath, correct_filename, correct_lines, correct_bags)
 		else:
-			document.assign_correct_bag(correct_filename, correct_lines)
-		document.assign_lines()
-		document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
-		document.save()
+			correct_filename, correct_lines = cleanup_file(filepath, correct_filename, correct_lines)
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
-	pilot_sessions = ['eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+	#pilot_sessions = ['eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
 
 	t0 = time.time()
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
 		cleanup(sess)
+		break
 	t1 = time.time()
 	print 'time taken', t1 - t0

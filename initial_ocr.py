@@ -6,6 +6,8 @@ import settings
 import video_to_frames
 # to resize images and save them
 from scipy import ndimage, misc
+# to time the process
+import time
 
 def make_ocr_ready_images(sess):
 	digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
@@ -40,7 +42,11 @@ if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
 
+	t0 = time.time()
 	for sess_name in pilot_sessions:
 		sess = video_to_frames.Session(sess_name)
+		make_ocr_ready_images(sess)
 		run_tesseract(sess)
+	t1 = time.time()
+	print 'time taken', t1 - t0
 

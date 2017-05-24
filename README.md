@@ -16,6 +16,8 @@ Currently finding macro transitions and transitions for the digital readings tak
 Resize frame images so characters are 20 pixels tall
 Frame images -> .hocr files via Tesseract
 
+Running Tesseract takes longer than any other part of this process. An important goal should be decreasing the number of times we run it (currently more than once a second for the digital reading).
+
 Questions:
 - Do we want to split the screen in half during the post test when the students are shown a split screen?
 
@@ -23,6 +25,8 @@ Questions:
 .hocr files -> .xml files which have been cleaned using the stimuli files
 
 Initially I am assuming that we have a text file for the stimuli with the correct line breaks and that students don't resize the web page during the experiment.
+
+This process currently takes almost an hour and 48 minutes per session with digital reading. Tessaract is defenatly taking up most of that time. On average each session with a digital reading component has 144 images associated with that reading. Our goal should be to not run tesseract on all of them.
 
 ### pair_screen_with_eyes.py
 .xml files -> .csv file with the distances from the x and y observed by the eye tracker to the words in the document (as displayed on the screen).

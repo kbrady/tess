@@ -10,6 +10,8 @@ Set the paths to directories for each part of the data. These should all be outs
 ### video_to_frames.py
 Screen grab video -> frame images
 
+Currently finding macro transitions and transitions for the digital readings takes 3:08 per session.
+
 ### initial_ocr.py
 Resize frame images so characters are 20 pixels tall
 Frame images -> .hocr files via Tesseract

@@ -9,6 +9,8 @@ import os
 import settings
 # to load and save metadata
 import json
+# to time how long everything is taking
+import time
 
 class Session:
 	def __init__(self, id_string):
@@ -68,6 +70,7 @@ class Session:
 			raise Exception('Time entered was greater than video length')
 		# find the directory to put frames in and create one if it doesn't exist yet
 		dir_name = self.dir_name + os.sep + 'frame-images'
+		dir_name = dir_name.replace(' ', '\ ')
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
 		filename = time_to_filename(current_time)
@@ -80,7 +83,6 @@ class Session:
 		command += ' -i '+self.screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
 		command = command.replace('(','\(')
 		command = command.replace(')','\)')
-		command = command.replace(' ','\ ')
 		os.system(command)
 
 	# a function to save time by not running ffmpeg more than necessary
@@ -179,6 +181,8 @@ class Session:
 		metadata.append(time_span)
 		# save everything to the metadata file if the save flag is True
 		if save_to_file:
+			# set own metadata in case this has not been done
+			self.metadata = metadata
 			with open(self.dir_name + os.sep + settings.metadata_file, 'w') as metadata_output:
 				metadata_output.write(json.dumps(metadata, ensure_ascii=False))
 		# return the calculated metadata
@@ -189,18 +193,23 @@ class Session:
 		times = assignments.keys()
 		times = [(filename_to_time(t), t) for t in times]
 		times.sort()
+		value_fun = lambda x: self.assess_stimuli_timestamps(file_list=[x])[x]
 		# go through the existing frames in order to find transitions
 		for i in range(len(times)-1):
 			# do a binary search for every gap that is more than .1 seconds wide
 			if assignments[times[i][1]] != assignments[times[i+1][1]]:
 				if times[i+1][0] - times[i][0] <= .1:
 					continue
-				self.binary_frame_search(times[i][0], times[i+1][0], assignments[times[i][1]], assignments[times[i+1][1]])
+				self.binary_frame_search(times[i][0], times[i+1][0], assignments[times[i][1]], assignments[times[i+1][1]], value_fun=value_fun)
 
-	def binary_frame_search(self, start_time, end_time, start_value, end_value, value_fun=lambda x: self.assess_stimuli_timestamps(file_list=[x])[x]):
+	def binary_frame_search(self, start_time, end_time, start_value, end_value, value_fun):
 		if start_time > end_time or end_time - start_time <= .15:
 			return
-		if type(start_time) == str:
+		# in some cases we compare whether the catagories of images
+		# (figured out by the functions below) are the same
+		# in other cases we want to check if the matracies representing the
+		# images are the same
+		if type(start_value) == str:
 			key = lambda x, y: x == y
 		else:
 			key = lambda x, y: (x == y).all()
@@ -257,11 +266,13 @@ def get_part_of_picture(image_path, x_range, y_range):
 	return pic
 
 def is_form(pic):
-	# only the forms had any purple in them so even a small amount of purple means it's a form
-	if image_has_color(pic, 10, rgb=[237, 230, 246]):
+	# only the forms had any purple in them
+	# however some may have purple which is off by an rgb value so we take this into effect
+	# forms should have about 10000 of these pixels at the top
+	if image_has_color(pic, 10000, rgb=[237, 230, 246], epsilon=0):
 		return True
 	# sometimes the form side goes white while loading the next question
-	pic_left = pic_left = pic[100:600, :600, :]
+	pic_left = pic[100:600, :600, :]
 	if not image_has_color(pic_left, rgb=[255, 255, 255]) > .99:
 		return False
 	# the other side should have text
@@ -281,8 +292,9 @@ def num_to_str(num):
 
 # this is used to identify which part of the webpage a frame belongs to
 # In our studies, the google form pages all had a puruple header which was not present in other pages
-def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=None):
-	num_pixels = sum(sum((pic[:,:,0] == rgb[0]) & (pic[:,:,1] == rgb[1]) & (pic[:,:,2] == rgb[2])))
+def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=None, epsilon=0):
+	difference_from_color = abs(pic[:,:,0] - rgb[0]) + abs(pic[:,:,1] - rgb[1]) + abs(pic[:,:,2] - rgb[2])
+	num_pixels = sum(sum(difference_from_color <= epsilon))
 	# if no threashold is given return the percentage of pixels that had the specified color
 	if threashold is None:
 		height, width, depth = pic.shape
@@ -293,6 +305,14 @@ def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=
 	else:
 		return (num_pixels > threashold) and (num_pixels < upper_threashold)
 
+# a function to build each session from scratch
+def build_session(sess_name):
+	sess = Session(sess_name)
+	sess.break_into_10_second_chunks()
+	sess.find_transitions()
+	sess.calculate_metadata(save_to_file=True)
+	sess.find_digital_reading_transitions()
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
@@ -300,14 +320,23 @@ if __name__ == '__main__':
 	# At some point I need to deal with what happens when there are spaces in the participant name
 	#, 'Kate is testing']
 
-	for sess_name in pilot_sessions:
-		sess = Session(sess_name)
-		sess.find_digital_reading_transitions()
-
-	# image_path = '/Users/kate/Documents/research/pipeline-data/seventh_participant/frame-images/16-40.jpg'
+	# image_path = '../pipeline-data/seventh_participant/frame-images/03-10.jpg'
 	# pic = np.array(misc.imread(image_path))
 	# # cut off the top and bottom parts of the frame which show the address bar and the dock
 	# # cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
 	# pic = pic[50:800, :900, :]
-	# print image_has_color(pic, rgb=[255, 255, 255])
+	# height, width, depth = pic.shape
+	# print image_has_color(pic, rgb=[237, 230, 246], epsilon=1) * (height*width)
+	# print is_form(pic)
+
+	t0 = time.time()
+	for sess_name in pilot_sessions:
+		print sess_name
+		sess = Session(sess_name)
+		sess.break_into_10_second_chunks()
+		sess.find_transitions()
+		sess.calculate_metadata(save_to_file=True)
+		sess.find_digital_reading_transitions()
+	t1 = time.time()
+	print 'time taken', t1 - t0
 

@@ -31,5 +31,7 @@ This process currently takes almost an hour and 48 minutes per session with digi
 ### pair_screen_with_eyes.py
 .xml files -> .csv file with the distances from the x and y observed by the eye tracker to the words in the document (as displayed on the screen).
 
+This currently takes .8 seconds per session with digital reading.
+
 ### visualize_single_page.py
 Make a video of a student reading a page a web page with the scrolling taken out (maybe have a sidebar showing where the current window is)

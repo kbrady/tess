@@ -420,6 +420,5 @@ if __name__ == '__main__':
 	for sess_name in pilot_sessions:
 		sess = Session(sess_name)
 		cleanup(sess)
-		break
 	t1 = time.time()
 	print 'time taken', t1 - t0

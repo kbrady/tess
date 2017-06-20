@@ -8,6 +8,9 @@
 *.hocr
 *.xml
 
+# We do however want to some images, hocr and xml files for visualization purposes
+!parts_for_viz/*/*
+
 # No MacOS or compiled BS
 .DS_Store
 .DS_Store?

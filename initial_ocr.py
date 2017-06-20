@@ -34,9 +34,12 @@ def run_tesseract(sess):
 			if not os.path.isdir(hocr_dir):
 				os.mkdir(hocr_dir)
 			hocr_path = hocr_dir + os.sep + '.'.join(filename.split('.')[:-1])
-			command = 'tesseract '+image_path+' '+hocr_path+' -l eng hocr'
-			print command
-			os.system(command)
+			run_tesseract_on_image(image_path, hocr_path)
+
+def run_tesseract_on_image(image_path, hocr_path):
+	command = 'tesseract '+image_path+' '+hocr_path+' -l eng hocr'
+	print command
+	os.system(command)
 
 if __name__ == '__main__':
 	# some session ids from the pilot data

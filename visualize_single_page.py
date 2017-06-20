@@ -13,5 +13,4 @@ def images_to_xml():
 	hocr_dir = 'parts_for_viz'+os.sep+'hocr-files'
 	for filename in os.listdir(hocr_dir):
 		hocr_path = hocr_dir + os.sep + filename
-		cleanup_file(hocr_path, correct_bags=get_correct_bags())
-
+		ocr_cleanup.cleanup_file(hocr_path, correct_bags=get_correct_bags())

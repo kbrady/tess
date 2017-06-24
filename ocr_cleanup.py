@@ -384,14 +384,15 @@ def get_correct_bags():
 			correct_bags[filename] = [l.strip() for l in input_file]
 	return correct_bags
 
-def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_bags=None):
+def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_bags=None, scale=True):
 	document = Document(filepath)
 	if correct_filename is None:
 		correct_filename, correct_lines = document.find_correct(correct_bags)
 	else:
 		document.assign_correct_bag(correct_filename, correct_lines)
 	document.assign_lines()
-	document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
+	if scale:
+		document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
 	document.save()
 	return correct_filename, correct_lines
 

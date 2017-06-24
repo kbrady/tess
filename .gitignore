@@ -17,3 +17,6 @@
 *.pyc
 tmp.*
 *.swp
+.*
+*.ipynb
+!.gitignore

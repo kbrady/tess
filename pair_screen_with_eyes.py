@@ -46,7 +46,9 @@ class Line(Part):
 		self.children = [Word(sub_tag) for sub_tag in tag.find_all('word')]
 
 	def __repr__(self):
-		return ' '.join([str(word) for word in self.children])
+		# We need to make sure to exclude empty words.
+		# The system has no method for filtering them and they are likely to occure with tessaract
+		return ' '.join([str(word) for word in self.children if len(str(word)) > 0])
 
 	def get_distances(self, x, y):
 		output = []

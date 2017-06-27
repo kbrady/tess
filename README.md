@@ -2,6 +2,11 @@
 
 This is a pipeline for post processing eye tracker data on students reading from a webpage. I am writing it for studies we are doing at Vanderbilt where the eye tracking software gives us a csv with the x and y positions of a student's eyes on the screen and a video.
 
+## Necessary Software
+In addition to Python 2.7, your system will need the following software packages to run this code:
+- [https://github.com/tesseract-ocr/tesseract](Tessaract)
+- ffmpeg
+
 ## Modules
 
 ### settings.py

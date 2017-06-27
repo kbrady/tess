@@ -12,6 +12,9 @@
 # We do however want to some images, hocr and xml files for visualization purposes
 !parts_for_viz/*/*
 
+# local paths should not be under version control or there will be conflicts every time
+local_paths.py
+
 # No MacOS or compiled BS
 .DS_Store
 .DS_Store?

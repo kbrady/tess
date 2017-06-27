@@ -1,6 +1,9 @@
-raw_dir_a = '../eye_tracker/eye_tracking-selected/suffrage_a/'
-raw_dir_b = '../eye_tracker/eye_tracking-selected/suffrage_b/'
-data_dir = '../pipeline-data/'
+# filepaths which point outside of this directory should not be in version control
+from local_paths import *
+# paths imported from local_paths.py
+	# raw_dir_a
+	# raw_dir_b
+	# data_dir
 frame_images_dir = 'frame-images'
 metadata_file = 'metadata.json'
 images_ready_for_ocr = 'resized-images'

@@ -7,6 +7,10 @@ In addition to Python 2.7, your system will need the following software packages
 - [https://github.com/tesseract-ocr/tesseract](Tessaract)
 - ffmpeg
 
+## Settings
+You will need a file called local_paths.py with path names to the directories your data is in and that generated files should be stored in.
+An example can be seen in local_paths_example.py
+
 ## Modules
 
 ### settings.py

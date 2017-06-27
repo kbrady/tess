@@ -11,6 +11,8 @@ import settings
 import json
 # to time how long everything is taking
 import time
+# for debugging
+import sys
 
 class Session:
 	def __init__(self, id_string):
@@ -23,7 +25,6 @@ class Session:
 		# find the files among the raw data that were recorded for this session
 		self.screen_recording_filename = self.calculate_filenames('Screen_Recordings')
 		self.sensor_data_filename = self.calculate_filenames('Sensor_Data')
-		self.webcam_filename = self.calculate_filenames('Webcam')
 		# load any metadata that exists
 		self.metadata = []
 		if os.path.exists(self.dir_name + os.sep + settings.metadata_file):
@@ -55,8 +56,7 @@ class Session:
 	def __repr__(self):
 		output = str(self.name_string) + '\n' 
 		output += str(self.screen_recordings) + '\n'
-		output += str(self.sensor_data) + '\n'
-		output += str(self.webcam)
+		output += str(self.sensor_data)
 		return output
 
 	def screen_time_to_picture(self, current_time, only_if_frame_does_not_exist=True):
@@ -70,9 +70,12 @@ class Session:
 			raise Exception('Time entered was greater than video length')
 		# find the directory to put frames in and create one if it doesn't exist yet
 		dir_name = self.dir_name + os.sep + 'frame-images'
-		dir_name = dir_name.replace(' ', '\ ')
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
+		# only replace spaces in dir_name with backslash spaces after running os commands on the original name
+		# (such as building the directory in the first place)
+		dir_name = dir_name.replace(' ', '\ ')
+		screen_recording_filename = self.screen_recording_filename.replace(' ', '\ ')
 		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
 		command = 'ffmpeg -ss 00:'
@@ -80,7 +83,7 @@ class Session:
 		minutes = int(current_time/60)
 		seconds = current_time - (minutes * 60)
 		command += num_to_str(minutes)+':'+num_to_str(seconds)
-		command += ' -i '+self.screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
+		command += ' -i '+screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
 		command = command.replace('(','\(')
 		command = command.replace(')','\)')
 		os.system(command)
@@ -315,12 +318,12 @@ def build_session(sess_name):
 
 def get_session_names():
 	all_sessions = []
-	for filename in os.listdir(settings.raw_dir_a+os.sep+'Screen Recordings'):
+	for filename in os.listdir(settings.raw_dir_a+'Screen_Recordings'):
 		if filename.find('_Website') == -1:
 			continue
 		sess_name = filename[len('Scene_'):filename.find('_Website')]
 		all_sessions.append(sess_name)
-	for filename in os.listdir(settings.raw_dir_b+os.sep+'Screen Recordings'):
+	for filename in os.listdir(settings.raw_dir_b+'Screen_Recordings'):
 		if filename.find('_Website') == -1:
 			continue
 		sess_name = filename[len('Scene_'):filename.find('_Website')]

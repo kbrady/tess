@@ -24,3 +24,6 @@ tmp.*
 .*
 *.ipynb
 !.gitignore
+
+# Similarly there should be nothing from the virtual environment folder
+venv_folder/*

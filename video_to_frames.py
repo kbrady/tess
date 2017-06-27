@@ -313,24 +313,26 @@ def build_session(sess_name):
 	sess.calculate_metadata(save_to_file=True)
 	sess.find_digital_reading_transitions()
 
+def get_session_names():
+	all_sessions = []
+	for filename in os.listdir(settings.raw_dir_a+os.sep+'Screen Recordings'):
+		if filename.find('_Website') == -1:
+			continue
+		sess_name = filename[len('Scene_'):filename.find('_Website')]
+		all_sessions.append(sess_name)
+	for filename in os.listdir(settings.raw_dir_b+os.sep+'Screen Recordings'):
+		if filename.find('_Website') == -1:
+			continue
+		sess_name = filename[len('Scene_'):filename.find('_Website')]
+		all_sessions.append(sess_name)
+	return all_sessions
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
-
-	# At some point I need to deal with what happens when there are spaces in the participant name
-	#, 'Kate is testing']
-
-	# image_path = '../pipeline-data/seventh_participant/frame-images/03-10.jpg'
-	# pic = np.array(misc.imread(image_path))
-	# # cut off the top and bottom parts of the frame which show the address bar and the dock
-	# # cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
-	# pic = pic[50:800, :900, :]
-	# height, width, depth = pic.shape
-	# print image_has_color(pic, rgb=[237, 230, 246], epsilon=1) * (height*width)
-	# print is_form(pic)
+	all_sessions = get_session_names()
 
 	t0 = time.time()
-	for sess_name in pilot_sessions:
+	for sess_name in all_sessions:
 		print sess_name
 		sess = Session(sess_name)
 		sess.break_into_10_second_chunks()

@@ -23,6 +23,7 @@ tmp.*
 *.swp
 .*
 *.ipynb
+nohup.out
 !.gitignore
 
 # Similarly there should be nothing from the virtual environment folder

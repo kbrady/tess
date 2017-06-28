@@ -13,6 +13,8 @@ import json
 import time
 # for debugging
 import sys
+# to run ffmpeg in the background
+import subprocess
 
 class Session:
 	def __init__(self, id_string):
@@ -59,6 +61,7 @@ class Session:
 		output += str(self.sensor_data)
 		return output
 
+	# switch only_if_frame_does_not_exist back to True
 	def screen_time_to_picture(self, current_time, only_if_frame_does_not_exist=True):
 		# It is good to have this turned on if you think you will run this on the same time stamp without meaning to
 		if only_if_frame_does_not_exist:
@@ -74,19 +77,24 @@ class Session:
 			os.mkdir(dir_name)
 		# only replace spaces in dir_name with backslash spaces after running os commands on the original name
 		# (such as building the directory in the first place)
-		dir_name = dir_name.replace(' ', '\ ')
-		screen_recording_filename = self.screen_recording_filename.replace(' ', '\ ')
+		#dir_name = dir_name.replace(' ', '\ ')
+		#screen_recording_filename = self.screen_recording_filename.replace(' ', '\ ')
 		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
-		command = 'ffmpeg -ss 00:'
+		# nohup stops the process from ending when the python script does
+		# [https://stackoverflow.com/questions/1605520/how-to-launch-and-run-external-script-in-background#1605539]
+		command = ['nohup', 'ffmpeg', '-ss']
 		# calculate the minutes and seconds of the time
 		minutes = int(current_time/60)
 		seconds = current_time - (minutes * 60)
-		command += num_to_str(minutes)+':'+num_to_str(seconds)
-		command += ' -i '+screen_recording_filename+' -frames:v 1 '+dir_name+os.sep+filename
-		command = command.replace('(','\(')
-		command = command.replace(')','\)')
-		os.system(command)
+		command.append('00:'+num_to_str(minutes)+':'+num_to_str(seconds))
+		command += ['-i', self.screen_recording_filename, '-frames:v', '1', dir_name+os.sep+filename]
+		#escape_fun = lambda part : part.replace('(','\(').replace(')','\)').replace(' ', '\ ')
+		#shell_command = ' '.join([escape_fun(x) for x in command]) + ' &'
+		#command = command.replace('(','\(')
+		#command = command.replace(')','\)')
+		subprocess.Popen(command)
+		#sys.exit()
 
 	# a function to save time by not running ffmpeg more than necessary
 	def picture_for_frame_exists(self, current_time):

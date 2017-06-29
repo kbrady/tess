@@ -37,16 +37,15 @@ def run_tesseract(sess):
 			run_tesseract_on_image(image_path, hocr_path)
 
 def run_tesseract_on_image(image_path, hocr_path):
-	command = 'tesseract '+image_path+' '+hocr_path+' -l eng hocr'
-	print command
-	os.system(command)
+	command = ['tesseract', image_path, hocr_path, '-l', 'eng', 'hocr']
+	subprocess.call(command)
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+	all_sessions = video_to_frames.get_session_names()
 
 	t0 = time.time()
-	for sess_name in pilot_sessions:
+	for sess_name in all_sessions:
 		sess = video_to_frames.Session(sess_name)
 		make_ocr_ready_images(sess)
 		run_tesseract(sess)

@@ -83,7 +83,7 @@ class Session:
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
 		# nohup stops the process from ending when the python script does
 		# [https://stackoverflow.com/questions/1605520/how-to-launch-and-run-external-script-in-background#1605539]
-		command = ['nohup', 'ffmpeg', '-ss']
+		command = ['ffmpeg', '-ss']
 		# calculate the minutes and seconds of the time
 		minutes = int(current_time/60)
 		seconds = current_time - (minutes * 60)

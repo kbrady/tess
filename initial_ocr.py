@@ -8,6 +8,8 @@ import video_to_frames
 from scipy import ndimage, misc
 # to time the process
 import time
+# to run subprocesses without dealing with spaces etc. by myself
+import subprocess
 
 def make_ocr_ready_images(sess):
 	digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']

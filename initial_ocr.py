@@ -38,7 +38,9 @@ def run_tesseract(sess):
 			hocr_path = hocr_dir + os.sep + '.'.join(filename.split('.')[:-1])
 			run_tesseract_on_image(image_path, hocr_path)
 
-def run_tesseract_on_image(image_path, hocr_path):
+def run_tesseract_on_image(image_path, hocr_path, redo=False):
+	if not redo and os.path.isfile(hoct_path):
+		return
 	command = ['tesseract', image_path, hocr_path, '-l', 'eng', 'hocr']
 	subprocess.call(command)
 

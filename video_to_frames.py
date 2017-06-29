@@ -93,7 +93,8 @@ class Session:
 		#shell_command = ' '.join([escape_fun(x) for x in command]) + ' &'
 		#command = command.replace('(','\(')
 		#command = command.replace(')','\)')
-		subprocess.Popen(command)
+		# Apparently Popen stops the python script after running
+		subprocess.call(command)
 		#sys.exit()
 
 	# a function to save time by not running ffmpeg more than necessary
@@ -341,6 +342,7 @@ def get_session_names():
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	all_sessions = get_session_names()
+	print all_sessions
 
 	t0 = time.time()
 	for sess_name in all_sessions:

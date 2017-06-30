@@ -3,7 +3,7 @@ import os
 # to look in the right places
 import settings
 # to get the session info
-from video_to_frames import Session
+from video_to_frames import Session, get_session_names
 # to read hocr files and write xml files
 from bs4 import BeautifulSoup
 # to write corrected output to file
@@ -414,12 +414,11 @@ def cleanup(sess):
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
-	#pilot_sessions = ['eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+	all_sessions = get_session_names()
 
 	t0 = time.time()
-	for sess_name in pilot_sessions:
+	for sess_name in all_sessions:
 		sess = Session(sess_name)
 		cleanup(sess)
 	t1 = time.time()
-	print 'time taken', t1 - t0
+	print 'time taken', t1 - t0, 'seconds'

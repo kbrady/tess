@@ -384,12 +384,16 @@ def get_correct_bags():
 			correct_bags[filename] = [l.strip() for l in input_file]
 	return correct_bags
 
-def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_bags=None, scale=True):
+def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_bags=None, scale=True, redo=False):
 	document = Document(filepath)
 	if correct_filename is None:
 		correct_filename, correct_lines = document.find_correct(correct_bags)
 	else:
 		document.assign_correct_bag(correct_filename, correct_lines)
+	# don't re-fix files which were fixed in a previous run
+	# (this is useful for when there are a lot of sessions and some throw errors)
+	if not redo and os.path.isfile(docutment.xml_file):
+		return correct_filename, correct_lines
 	document.assign_lines()
 	if scale:
 		document.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)

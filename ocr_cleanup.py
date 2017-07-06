@@ -204,6 +204,9 @@ class Document:
 		# find the minimum, maximum and std of currect lines
 		# (we will use this to determine if incorrect lines should be included)
 		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
+		if len(totally_correct_lines) == 0:
+			print self.tesseract_file
+			print self.lines
 		right_points = [l.bbox.right for l in totally_correct_lines]
 		left_points = [l.bbox.left for l in totally_correct_lines]
 		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
@@ -392,7 +395,7 @@ def cleanup_file(filepath, correct_filename=None, correct_lines=None, correct_ba
 		document.assign_correct_bag(correct_filename, correct_lines)
 	# don't re-fix files which were fixed in a previous run
 	# (this is useful for when there are a lot of sessions and some throw errors)
-	if not redo and os.path.isfile(docutment.xml_file):
+	if not redo and os.path.isfile(document.xml_file):
 		return correct_filename, correct_lines
 	document.assign_lines()
 	if scale:

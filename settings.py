@@ -1,8 +1,7 @@
 # filepaths which point outside of this directory should not be in version control
 from local_paths import *
 # paths imported from local_paths.py
-	# raw_dir_a
-	# raw_dir_b
+	# raw_dirs
 	# data_dir
 frame_images_dir = 'frame-images'
 metadata_file = 'metadata.json'

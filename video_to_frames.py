@@ -39,7 +39,7 @@ class Session:
 	def calculate_filenames(self, dir_name):
 		output = []
 		# look through the files in both conditions, this makes it easier than remember all the condition pairings
-		for path_start in [settings.raw_dir_a, settings.raw_dir_b]:
+		for path_start in settings.raw_dirs:
 			path = path_start + dir_name
 			path = path if path.endswith(os.sep) else path + os.sep
 			for filename in os.listdir(path):
@@ -327,17 +327,20 @@ def build_session(sess_name):
 
 def get_session_names():
 	all_sessions = []
-	for filename in os.listdir(settings.raw_dir_a+'Screen_Recordings'):
-		if filename.find('_Website') == -1:
-			continue
-		sess_name = filename[len('Scene_'):filename.find('_Website')]
-		all_sessions.append(sess_name)
-	for filename in os.listdir(settings.raw_dir_b+'Screen_Recordings'):
-		if filename.find('_Website') == -1:
-			continue
-		sess_name = filename[len('Scene_'):filename.find('_Website')]
-		all_sessions.append(sess_name)
+	for foldername in settings.raw_dirs:
+		if not foldername.endswith(os.sep):
+			foldername += os.sep
+		for filename in os.listdir(foldername+'Screen_Recordings'):
+			if filename.find('_Website') == -1:
+				continue
+			sess_name = filename[len('Scene_'):filename.find('_Website')]
+			all_sessions.append(sess_name)
 	return all_sessions
+
+def already_made_session(sess_name):
+	if os.path.isdir(settings.data_dir + sess_name):
+		return True
+	return False
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
@@ -346,6 +349,8 @@ if __name__ == '__main__':
 
 	t0 = time.time()
 	for sess_name in all_sessions:
+		if already_made_session(sess_name):
+			continue
 		print sess_name
 		sess = Session(sess_name)
 		sess.break_into_10_second_chunks()

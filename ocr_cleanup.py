@@ -60,24 +60,38 @@ class Part(object):
 		self.bbox = BBox(info[0][info[0].find(' ')+1:])
 		self.id = tag['id']
 
-	def levenshteinDistance(self, s2):
+	# this is can be a fuzzy match
+	# we'd like to match sub-strings for lines but full strings for words
+	# sometimes we have the full line but not always
+	def levenshteinDistance(self, s2, line_level=False):
 		s1 = str(self)
 		if len(s1) == 0:
 			return 1.0
 		if len(s1) > len(s2):
 			s1, s2 = s2, s1
 
-		distances = range(len(s1) + 1)
+		# if we are matching lines we are interested in sub-strings
+		# but in the word case it costs us more to add letters to
+		# s1 (this string) than s2 (the word)
+		cost_of_skipping_s2_letters = 0 if line_level else 1
+		cost_of_skipping_s1_letters = 1 if line_level else 1.5
+		cost_of_substatuting_letters = 1
+		distances = [v*cost_of_skipping_s1_letters for v in range(len(s1) + 1)]
 		for i2, c2 in enumerate(s2):
-			distances_ = [i2+1]
+			# cost of starting here and skipping the rest of s2
+			distances_ = [(i2+1)*cost_of_skipping_s2_letters]
 			for i1, c1 in enumerate(s1):
 				if c1 == c2:
 					distances_.append(distances[i1])
 				else:
-					distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+					skip_this_letter_in_s2 = distances[i1] + cost_of_skipping_s2_letters
+					skip_this_letter_in_s1 = distances_[-1] + cost_of_skipping_s1_letters
+					substatute_this_letter = distances[i1 + 1] + cost_of_substatuting_letters
+					distances_.append(min((skip_this_letter_in_s2, skip_this_letter_in_s1, substatute_this_letter)))
 			distances = distances_
-		return float(distances[-1])/max([len(s1), len(s2)])
+		return float(distances[-1])/len(s1)
 
+	# this is used to match words not lines
 	def find_matching(self, all_strings):
 		all_strings = [(self.levenshteinDistance(all_strings[i]), all_strings[i], i) for i in range(len(all_strings))]
 		return min(all_strings)
@@ -142,13 +156,14 @@ class Line(Part):
 
 # An object to interpret hocr files
 class Document:
-	def __init__(self, tesseract_file):
+	def __init__(self, tesseract_file, xml_dir=None):
 		# save the location of the original file
 		self.tesseract_file = tesseract_file
 		if not tesseract_file.endswith('.hocr'):
 			raise Exception(tesseract_file+' is not of type .hocr')
 		# save the locaiton where corrected files will be saved to
-		xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		if xml_dir is None:
+			xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
 		if not os.path.isdir(xml_dir):
 			os.mkdir(xml_dir)
 		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
@@ -189,9 +204,7 @@ class Document:
 		self.lines.remove(line)
 		self.root.remove(line.et)
 
-	def assign_lines(self):
-		if len(self.correct_lines) == 0:
-			raise RuntimeError('Need to assign correct lines to document')
+	def percent_of_initial_correct(self):
 		bag_of_lines = [str(l) for l in self.lines]
 		# start by finding the exact matches
 		# currently we expect there to be a lot of these. This might not hold up in the future
@@ -204,24 +217,52 @@ class Document:
 		# find the minimum, maximum and std of currect lines
 		# (we will use this to determine if incorrect lines should be included)
 		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
-		if len(totally_correct_lines) == 0:
+		return float(len(totally_correct_lines))/len(self.lines)
+
+	def assign_lines(self, testing=False):
+		if len(self.correct_lines) == 0:
+			raise RuntimeError('Need to assign correct lines to document')
+		# pair each word with it's line
+		word_pairings = []
+		for i in range(len(self.correct_lines)):
+			for w in self.correct_lines[i].split(' '):
+				if len(w) > 0:
+					word_pairings.append((w,i))
+		word_counts = Counter([x[0] for x in word_pairings])
+		unique_words = dict([x for x in word_pairings if word_counts[x[0]] == 1])
+		# start by finding words which are exact matches and occur only once in the document
+		# if there are at least two such words in a line and all found words correspond to the same 
+		# line, match the two lines
+		line_assignments = [-1] * len(self.lines)
+		for i in range(len(self.lines)):
+			word_assignments = []
+			for w in self.lines[i].children:
+				word_text = w.text
+				if word_text in unique_words:
+					word_assignments.append(unique_words[word_text])
+			if len(word_assignments) > 1 and word_assignments.count(word_assignments[0]) == len(word_assignments):
+				line_assignments[i] = word_assignments[0]
+		# find the minimum, maximum and std of currect lines
+		# (we will use this to determine if incorrect lines should be included)
+		matched_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
+		if len(matched_lines) == 0:
 			print self.tesseract_file
 			print self.lines
-		right_points = [l.bbox.right for l in totally_correct_lines]
-		left_points = [l.bbox.left for l in totally_correct_lines]
+		right_points = [l.bbox.right for l in matched_lines]
+		left_points = [l.bbox.left for l in matched_lines]
 		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
 		right_dimensions = Dimensions(min(right_points), max(right_points), reasonable_deviation(right_points, left_points))
 		left_dimensions = Dimensions(min(left_points), max(left_points), reasonable_deviation(left_points, right_points))
-		# make a list of lines to delete and delete them after assigning the rest of the lines
-		# (so as not to change the indices)
-		blank_lines = []
-		# fill in missing lines (for the moment assume no mistakes with the last step)
-		for i in range(len(bag_of_lines)):
+		# make a list of the assignments to be carried out which can be looked at seperately by the tester
+		final_assignment = []
+		# fill in missing lines (for the moment assume no mistakes with the original matching step)
+		for i in range(len(line_assignments)):
 			if line_assignments[i] != -1:
+				final_assignment.append((i, line_assignments[i]))
 				continue
 			# reject lines which are beyond a standard deviation outside the right and left endpoints of correct lines
 			if not valid_line(self.lines[i].bbox, right_dimensions, left_dimensions):
-				blank_lines.append(self.lines[i])
+				final_assignment.append((i, None))
 				continue
 			# find the candidates for the correct line and look through them for the best match
 			low_index, high_index = self.find_line_to_assign(line_assignments, i)
@@ -231,24 +272,38 @@ class Document:
 			# make sure indexes stay within the bounds of self.correct_lines
 			# you will need to add 1 to high_index so the loop will work when high_index == low_index
 			for line_index in range(max(low_index, 0), min(high_index+1, len(self.correct_lines))):
-				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index])
+				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index], line_level=True)
 				if d < distance:
 					distance = d
 					correct_line_index = line_index
 			# if a good candidate couldn't be found, blank the line
 			if correct_line_index is None:
-				blank_lines.append(self.lines[i])
+				final_assignment.append((i, None))
 				continue
-			# less than 50% of the line needs to be changed (and it is less than 50% away from the correct line)
+			# less than 50% of the line needs to be changed
+			# (this may be a substring so it can actually be quite far from the correct line)
 			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
 			# short lines with lots of numbers
 			if distance < .5:
-				self.lines[i].assign_matching(self.correct_lines[correct_line_index])
+				final_assignment.append((i, correct_line_index))
 			else:
-				blank_lines.append(self.lines[i])
-		# remove lines which were not matched
-		for l in blank_lines:
-			self.remove_line(l)
+				final_assignment.append((i, None))
+		# if this is not a test carry out the assignments. Otherwise return the result
+		if not testing:
+			# make a list of lines to delete and delete them after assigning the rest of the lines
+			# (so as not to change the indices)
+			blank_lines = []
+			for index_pair in final_assignment:
+				if index_pair[1] is not None:
+					self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]])
+				else:
+					blank_lines.append(self.lines[i])
+			# remove lines which were not matched
+			for l in blank_lines:
+				self.remove_line(l)
+		else:
+			conversion_fun = lambda p : (self.lines[p[0]].__repr__(), self.correct_lines[p[1]] if p[1] is not None else None)
+			return [conversion_fun(p) for p in final_assignment]
 
 	def find_line_to_assign(self, line_assignments, index, forward=True):
 		iterator = 1 if forward else -1
@@ -350,7 +405,7 @@ def assign(set_to_assign, all_strings, complete_coverage=False):
 		if before is None:
 			assignment[match_index] = max(after - (after_index - match_index), 0)
 			continue
-		# if no word was assigned after this one, assign  this word to the lesser of
+		# if no word was assigned after this one, assign this word to the lesser of
 		# the latest word found before plus the difference between this word and that one
 		# and the last index
 		if after is None:
@@ -419,6 +474,28 @@ def cleanup(sess):
 		else:
 			correct_filename, correct_lines = cleanup_file(filepath, correct_filename, correct_lines)
 
+def find_percent_correct(sess):
+	correct_bags = get_correct_bags()
+	dir_name = sess.dir_name + os.sep + settings.hocr_dir
+	correct_filename = None
+	correct_lines = None
+	precent_correct = []
+	# don't bother with sessions which don't have any hocr files
+	if not os.path.isdir(dir_name):
+		return
+	for filename in os.listdir(dir_name):
+		filepath = dir_name + os.sep + filename
+		document = Document(filepath)
+		if len(document.lines) == 0:
+			continue
+		if correct_filename is None:
+			correct_filename, correct_lines = document.find_correct(correct_bags)
+		else:
+			document.assign_correct_bag(correct_filename, correct_lines)
+		precent_correct.append(document.percent_of_initial_correct())
+	print 'mean:', np.mean(precent_correct)
+	print 'std:', np.std(precent_correct)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	all_sessions = get_session_names()
@@ -426,6 +503,8 @@ if __name__ == '__main__':
 	t0 = time.time()
 	for sess_name in all_sessions:
 		sess = Session(sess_name)
-		cleanup(sess)
+		print sess_name
+		find_percent_correct(sess)
+		#cleanup(sess)
 	t1 = time.time()
 	print 'time taken', t1 - t0, 'seconds'

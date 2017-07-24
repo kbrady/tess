@@ -63,23 +63,21 @@ class Part(object):
 	# this is can be a fuzzy match
 	# we'd like to match sub-strings for lines but full strings for words
 	# sometimes we have the full line but not always
-	def levenshteinDistance(self, s2, line_level=False):
+	def levenshteinDistance(self, s2):
 		s1 = str(self)
 		if len(s1) == 0:
 			return 1.0
-		if len(s1) > len(s2):
-			s1, s2 = s2, s1
 
 		# if we are matching lines we are interested in sub-strings
 		# but in the word case it costs us more to add letters to
 		# s1 (this string) than s2 (the word)
-		cost_of_skipping_s2_letters = 0 if line_level else 1
-		cost_of_skipping_s1_letters = 1 if line_level else 1.5
+		cost_of_skipping_s2_letters = 1
+		cost_of_skipping_s1_letters = 1.5
 		cost_of_substatuting_letters = 1
 		distances = [v*cost_of_skipping_s1_letters for v in range(len(s1) + 1)]
 		for i2, c2 in enumerate(s2):
 			# cost of starting here and skipping the rest of s2
-			distances_ = [(i2+1)*cost_of_skipping_s2_letters]
+			distances_ = [distances[0] + cost_of_skipping_s2_letters]
 			for i1, c1 in enumerate(s1):
 				if c1 == c2:
 					distances_.append(distances[i1])
@@ -139,6 +137,39 @@ class Line(Part):
 	
 	def __repr__(self):
 		return ' '.join([str(word) for word in self.children])
+
+	# I am making a line specific implementation of this so we can have fuzzy
+	# matching for substrings (the whole line is sometimes not visible due to sidebar etc.)
+	def levenshteinDistance(self, s2):
+		s1 = str(self)
+		if len(s1.strip()) == 0:
+			return 1.0
+
+		# if we are matching lines we are interested in sub-strings
+		# but in the word case it costs us more to add letters to
+		# s1 (this string) than s2 (the word)
+		cost_of_skipping_edge_s2_letters = .01
+		cost_of_skipping_mid_s2_letters = 1
+		cost_of_skipping_s1_letters = 1
+		cost_of_substatuting_letters = 1
+		distances = [v*cost_of_skipping_s1_letters for v in range(len(s1) + 1)]
+		for i2, c2 in enumerate(s2):
+			# cost of starting here and skipping the rest of s2
+			distances_ = [0 + cost_of_skipping_edge_s2_letters]
+			for i1, c1 in enumerate(s1):
+				if c1 == c2:
+					distances_.append(distances[i1])
+				else:
+					if i1 == len(s1) - 1:
+						# cost of ending here and skipping the rest of s2
+						skip_this_letter_in_s2 = distances[i1] + cost_of_skipping_edge_s2_letters
+					else:
+						skip_this_letter_in_s2 = distances[i1] + cost_of_skipping_mid_s2_letters
+					skip_this_letter_in_s1 = distances_[-1] + cost_of_skipping_s1_letters
+					substatute_this_letter = distances[i1 + 1] + cost_of_substatuting_letters
+					distances_.append(min((skip_this_letter_in_s2, skip_this_letter_in_s1, substatute_this_letter)))
+			distances = distances_
+		return float(distances[-1])/len(s1)
 
 	def assign_matching(self, string):
 		self.updated_line = string
@@ -219,7 +250,9 @@ class Document:
 		totally_correct_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		return float(len(totally_correct_lines))/len(self.lines)
 
-	def assign_lines(self, testing=False):
+	# This is the first half of the assign_lines function.
+	# I made it into it's own function for testing purposes.
+	def get_line_matches(self, testing=False):
 		if len(self.correct_lines) == 0:
 			raise RuntimeError('Need to assign correct lines to document')
 		# pair each word with it's line
@@ -234,20 +267,34 @@ class Document:
 		# if there are at least two such words in a line and all found words correspond to the same 
 		# line, match the two lines
 		line_assignments = [-1] * len(self.lines)
+		# keep track of the words you find for auditing the system
+		words_found = {}
 		for i in range(len(self.lines)):
 			word_assignments = []
+			wf_list = []
 			for w in self.lines[i].children:
 				word_text = w.text
 				if word_text in unique_words:
 					word_assignments.append(unique_words[word_text])
+					wf_list.append(word_text)
 			if len(word_assignments) > 1 and word_assignments.count(word_assignments[0]) == len(word_assignments):
 				line_assignments[i] = word_assignments[0]
+				words_found[i] = wf_list
 		# find the minimum, maximum and std of currect lines
 		# (we will use this to determine if incorrect lines should be included)
 		matched_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		if len(matched_lines) == 0:
 			print self.tesseract_file
 			print self.lines
+			raise RuntimeError('No lines matched')
+		# if we are testing this system return the words which were found too
+		if testing:
+			return matched_lines, line_assignments, words_found
+		else:
+			return matched_lines, line_assignments
+
+	def assign_lines(self, testing=False):
+		matched_lines, line_assignments = self.get_line_matches()
 		right_points = [l.bbox.right for l in matched_lines]
 		left_points = [l.bbox.left for l in matched_lines]
 		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
@@ -256,15 +303,13 @@ class Document:
 		# make a list of the assignments to be carried out which can be looked at seperately by the tester
 		final_assignment = []
 		# fill in missing lines (for the moment assume no mistakes with the original matching step)
-		for i in range(len(line_assignments)):
-			if line_assignments[i] != -1:
-				final_assignment.append((i, line_assignments[i]))
+		for i, line_match_i in enumerate(line_assignments):
+			if line_match_i != -1:
+				final_assignment.append((i, line_match_i))
 				continue
-			# reject lines which are beyond a standard deviation outside the right and left endpoints of correct lines
-			if not valid_line(self.lines[i].bbox, right_dimensions, left_dimensions):
-				final_assignment.append((i, None))
-				continue
-			# find the candidates for the correct line and look through them for the best match
+			# I need to do something to prevent highlights from being seen as part of the text
+			# However just rejecting things which are abnormally sized doesn't work because titles will
+			# be rejected.
 			low_index, high_index = self.find_line_to_assign(line_assignments, i)
 			distance = 1.0
 			correct_line_index = None
@@ -272,7 +317,7 @@ class Document:
 			# make sure indexes stay within the bounds of self.correct_lines
 			# you will need to add 1 to high_index so the loop will work when high_index == low_index
 			for line_index in range(max(low_index, 0), min(high_index+1, len(self.correct_lines))):
-				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index], line_level=True)
+				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index])
 				if d < distance:
 					distance = d
 					correct_line_index = line_index
@@ -284,7 +329,7 @@ class Document:
 			# (this may be a substring so it can actually be quite far from the correct line)
 			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
 			# short lines with lots of numbers
-			if distance < .5:
+			if distance < .6:
 				final_assignment.append((i, correct_line_index))
 			else:
 				final_assignment.append((i, None))

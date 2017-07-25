@@ -347,7 +347,7 @@ class Document:
 			for l in blank_lines:
 				self.remove_line(l)
 		else:
-			conversion_fun = lambda p : (self.lines[p[0]].__repr__(), self.correct_lines[p[1]] if p[1] is not None else None)
+			conversion_fun = lambda p : (self.lines[p[0]], self.correct_lines[p[1]] if p[1] is not None else None)
 			return [conversion_fun(p) for p in final_assignment]
 
 	def find_line_to_assign(self, line_assignments, index, forward=True):

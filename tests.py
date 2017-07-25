@@ -31,10 +31,10 @@ def line_assignment_test(hocr_file, correct_filename):
 	stats_file = 'test-output' + os.sep + hocr_file.split(os.sep)[-1][:-len('.hocr')]+'.csv'
 	with open(stats_file, 'w') as outfile:
 		writer = csv.writer(outfile, delimiter=',', quotechar='"')
-		writer.writerow(['Tesseract Line', 'Corrected Line', 'Matched Using Words'])
+		writer.writerow(['Tesseract Line', 'Corrected Line', 'Matched Using Words', 'Line ID'])
 		for pair in assignment:
 			matched_on_words = 1 if pair[1] is not None and correct_bags[correct_filename].index(pair[1]) in line_assignments else 0
-			writer.writerow(list(pair) + [matched_on_words])
+			writer.writerow(list(pair) + [matched_on_words, pair[0].id])
 
 def line_similarity_test(hocr_file, correct_filename):
 	correct_bags = ocr_cleanup.get_correct_bags()

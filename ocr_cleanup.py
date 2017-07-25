@@ -152,24 +152,24 @@ class Line(Part):
 		cost_of_skipping_mid_s2_letters = s2_mid_cost
 		cost_of_skipping_s1_letters = s1_cost
 		cost_of_substatuting_letters = sub_cost
-		distances = [v*cost_of_skipping_s1_letters for v in range(len(s1) + 1)]
-		for i2, c2 in enumerate(s2):
+		distances = [v*cost_of_skipping_edge_s2_letters for v in range(len(s2) + 1)]
+		for i1, c1 in enumerate(s1):
 			# cost of starting here and skipping the rest of s2
-			distances_ = [1 * cost_of_skipping_edge_s2_letters]
-			for i1, c1 in enumerate(s1):
+			distances_ = [distances[0] + cost_of_skipping_s1_letters]
+			for i2, c2 in enumerate(s2):
 				if c1 == c2:
-					distances_.append(distances[i1])
+					# indexes are off by one since we start with the null position so this is
+					# actually the value diaganally upwards from the current position
+					distances_.append(distances[i2])
 				else:
-					if i1 == len(s1) - 1:
-						# cost of ending here and skipping the rest of s2
-						skip_this_letter_in_s2 = distances[i1] + cost_of_skipping_edge_s2_letters
-					else:
-						skip_this_letter_in_s2 = distances[i1] + cost_of_skipping_mid_s2_letters
-					skip_this_letter_in_s1 = distances_[-1] + cost_of_skipping_s1_letters
-					substatute_this_letter = distances[i1 + 1] + cost_of_substatuting_letters
+					skip_this_letter_in_s1 = distances[i2] + cost_of_skipping_s1_letters
+					skip_this_letter_in_s2 = distances_[-1] + cost_of_skipping_mid_s2_letters
+					substatute_this_letter = distances[i2 + 1] + cost_of_substatuting_letters
 					distances_.append(min((skip_this_letter_in_s2, skip_this_letter_in_s1, substatute_this_letter)))
 			distances = distances_
-		return float(distances[-1])/len(s1)
+		# we need a final row on the bottom like the one on the top to add the cost of edge skips at the end
+		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
+		return float(min(final_distances))/len(s1)
 
 	def assign_matching(self, string):
 		self.updated_line = string

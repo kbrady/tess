@@ -4,11 +4,31 @@ from bs4 import BeautifulSoup
 import unittest
 # to call in functions for testing
 import ocr_cleanup
+# to make tests not all standard
+import random
+# to build random strings
+import string
 
 class TestLevenshteinDistance(unittest.TestCase):
 
 	def test_online_example(self):
-		self.assertEqual(test_line_levenshteinDistance("aba", "c abba c", s2_edge_cost=0)*len("aba"), 1.0)
+		self.assertAlmostEqual(test_line_levenshteinDistance("aba", "c abba c", s2_edge_cost=0)*len("aba"), 1.0)
+		self.assertAlmostEqual(test_line_levenshteinDistance("aba", "c abba c", s2_edge_cost=0.1)*len("aba"), 1.4)
+
+	# At the moment this only considers ascii letters. We may want to change this in future.
+	def test_skipping(self):
+		for test_num in range(20):
+			sub_string = ""
+			for i in range(random.choice(range(20))):
+				sub_string += random.choice(string.ascii_letters)
+			larger_string = sub_string
+			fluff_num = random.choice(range(10))
+			for i in range(fluff_num):
+				if random.choice([True, False]):
+					larger_string = random.choice(string.ascii_letters) + larger_string
+				else:
+					larger_string += random.choice(string.ascii_letters)
+			self.assertAlmostEqual(test_line_levenshteinDistance(sub_string, larger_string, s2_edge_cost=0.1)*len(sub_string), fluff_num*0.1)
 
 def make_line_with_text(line_string):
 	line_tag_text = """

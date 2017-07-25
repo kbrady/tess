@@ -140,7 +140,7 @@ class Line(Part):
 
 	# I am making a line specific implementation of this so we can have fuzzy
 	# matching for substrings (the whole line is sometimes not visible due to sidebar etc.)
-	def levenshteinDistance(self, s2):
+	def levenshteinDistance(self, s2, s2_edge_cost=.01, s2_mid_cost=1, s1_cost=1, sub_cost=1):
 		s1 = str(self)
 		if len(s1.strip()) == 0:
 			return 1.0
@@ -148,14 +148,14 @@ class Line(Part):
 		# if we are matching lines we are interested in sub-strings
 		# but in the word case it costs us more to add letters to
 		# s1 (this string) than s2 (the word)
-		cost_of_skipping_edge_s2_letters = .01
-		cost_of_skipping_mid_s2_letters = 1
-		cost_of_skipping_s1_letters = 1
-		cost_of_substatuting_letters = 1
+		cost_of_skipping_edge_s2_letters = s2_edge_cost
+		cost_of_skipping_mid_s2_letters = s2_mid_cost
+		cost_of_skipping_s1_letters = s1_cost
+		cost_of_substatuting_letters = sub_cost
 		distances = [v*cost_of_skipping_s1_letters for v in range(len(s1) + 1)]
 		for i2, c2 in enumerate(s2):
 			# cost of starting here and skipping the rest of s2
-			distances_ = [0 + cost_of_skipping_edge_s2_letters]
+			distances_ = [1 * cost_of_skipping_edge_s2_letters]
 			for i1, c1 in enumerate(s1):
 				if c1 == c2:
 					distances_.append(distances[i1])

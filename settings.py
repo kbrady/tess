@@ -11,3 +11,6 @@ xml_dir = 'xml-files'
 digital_reading_x_range = [200, 1200]
 digital_reading_y_range = [40, 860]
 eye_tracking_word_csv_file = 'eye_tracking.csv'
+eye_tracking_mapped_csv_file = 'mapped_values.csv'
+# a value for heatmaps
+pixels_per_bin = 100

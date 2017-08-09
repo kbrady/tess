@@ -10,9 +10,21 @@ import pair_screen_with_eyes
 from video_to_frames import Session
 # to store values
 from collections import defaultdict
+# to investigate distributions
+from collections import Counter
 # for making and reading images
 from matplotlib import pyplot as plt
 from PIL import Image
+# to save mapped values
+import csv
+# to interpret csv data as objects
+from collections import namedtuple
+# to make heatmaps
+import numpy as np
+# to resize heatmaps to overlap images
+from scipy import ndimage
+# to define things once
+import settings
 
 def images_to_xml():
 	# Run tesseract on the website images
@@ -69,13 +81,114 @@ def get_x_and_y(line_val, top):
 	y = line_val.bbox.top if top else line_val.bbox.bottom
 	return x, y
 
+def calculate_mapped_values_and_save(sess):
+	# get the pairing of gaze data with OCR interpreted frames
+	corpus = pair_screen_with_eyes.Corpus(sess)
+	row_list = pair_screen_with_eyes.get_eye_tracking_rows(sess)
+	document_assignment = corpus.assign_rows(row_list)
+	with open(sess.dir_name + os.sep + settings.eye_tracking_mapped_csv_file, 'w') as output_file:
+		# open a csv to write into
+		writer = csv.writer(output_file, delimiter=',', quotechar='"')
+		# write a header
+		writer.writerow(['Mapped_X', 'Mapped_Y', 'Timestamp', 'MediaTime'])
+		# initialize values to None
+		mapping_function = None
+		frame_document_index = None
+		for pair in document_assignment:
+			row = pair[0]
+			if int(row.GazeX) < 0 or int(row.GazeY) < 0:
+				continue
+			if pair[1] != frame_document_index:
+				# this is the xml for the frame
+				frame_document = corpus.documents[pair[1]]
+				mapping_function = visualize_single_page.get_mapping_function(frame_document, viz_document_dict)
+			mapped_x, mapped_y = mapping_function(int(row.GazeX), int(row.GazeY))
+			writer.writerow([mapped_x, mapped_y, row.Timestamp, row.MediaTime])
+
+def make_heatmap(session_names, dst_img_path):
+	# initialize everything
+	dst_img = Image.open(dst_img_path)
+	horz, vert = dst_img.size
+	bins = np.zeros([(vert/settings.pixels_per_bin)+1, (horz/settings.pixels_per_bin)+1])
+	# put the data into the bins
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		with open(sess.dir_name + os.sep + settings.eye_tracking_mapped_csv_file, 'r') as in_file:
+			reader = csv.reader(in_file, delimiter=',', quotechar='"')
+			row_obj = None
+			for row in reader:
+				if row_obj is None:
+					row_obj = namedtuple('row_obj', list(row))
+					continue
+				row = row_obj(*tuple(row))
+				x = float(row.Mapped_X)
+				y = float(row.Mapped_Y)
+				if x < 0 or x > horz or y < 0 or y > vert:
+					continue
+				x_index = int(x/settings.pixels_per_bin)
+				y_index = int(y/settings.pixels_per_bin)
+				bins[y_index, x_index] += 1
+	return bins
+
+def bin_heatmap(heatmap, parts=4):
+	# figure out where to put dividers to make equally sized bins
+	value_counts = Counter(list(heatmap.flatten()))
+	total = sum(value_counts.values())
+
+	keys = value_counts.keys()
+	keys.sort()
+
+	cuttoffs = []
+	sum_total = 0
+
+	for k in keys:
+		sum_total += value_counts[k]
+		if sum_total >= float(total)/parts:
+			cuttoffs.append(k)
+			sum_total = 0
+
+	# calculate which bin each cell is in
+	output = np.zeros(heatmap.shape)
+	for i in range(len(cuttoffs)):
+		if i == len(cuttoffs)-1:
+			output[heatmap > cuttoffs[i]] = i+1
+		else:
+			output[(heatmap > cuttoffs[i]) & (output <= cuttoffs[i+1])] = i+1
+	return output, cuttoffs
+
+def plot_heatmap(bins, dst_img_path, output_path, parts=4):
+	dst_img = Image.open(dst_img_path)
+	# bin for better viewing
+	binned_headmap, cuttoffs = bin_heatmap(bins, parts)
+	heatmap_image = ndimage.zoom(binned_headmap, settings.pixels_per_bin, order=0)
+	# make the plot
+	fig = plt.figure()
+	ax = fig.add_subplot(1,1,1)
+	ax.imshow(dst_img)
+	cax = ax.imshow(heatmap_image, cmap=plt.cm.gray, interpolation='nearest', alpha=.5)
+	# get rid of axes
+	ax.set_xticks([])
+	ax.set_yticks([])
+	# Add colorbar, make sure to specify tick locations to match desired ticklabels
+	# We need to define boundries to avoid getting a continuous color bar
+	boundaries = [0] + [x+.5 for x in range(len(cuttoffs))] + [parts-1]
+	cbar = fig.colorbar(cax, ticks=range(parts), boundaries=boundaries)
+	# strings to describe each bin
+	labels = ['<='+str(cuttoffs[0])]
+	labels += ['('+str(cuttoffs[i-1])+','+str(cuttoffs[i])+']' for i in range(1,len(cuttoffs))]
+	labels.append('>'+str(cuttoffs[-1]))
+	cbar.ax.set_yticklabels(labels)  # vertically oriented colorbar
+	ax.set_title('Number of Fixations')
+	plt.savefig(output_path, dpi=800)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	pilot_sessions = ['seventh_participant', 'fifth_participant', 'third_student_participant', 'first_student_participant_second_take', 'first_student_participant', 'Amanda', 'eighth_participant', 'sixth_participant', 'fourth-participant-second-version' , 'fourth_participant', 'second_student_participant']
+	session_even_names = ['fourth-participant-second-version', 'second_student_participant', 'sixth_participant'] # 'eighth_participant'
+	session_odd_names = ['fifth_participant', 'first_student_participant_second_take','seventh_participant', 'third_student_participant']
 	
-	viz_documents = get_viz_documents()
-	sess = Session(pilot_sessions[0])
-	corpus = pair_screen_with_eyes.Corpus(sess)
-	print corpus.documents[-5].xml_filepath
-	print corpus.documents[-4].xml_filepath
+	heatmap = make_heatmap(session_odd_names, 'parts_for_viz/resized-images/womens_suffrage_2_A.png')
+	plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_2_A.png', 'womens_suffrage_2_A_heatmap.png', parts=5)
+
+	heatmap = make_heatmap(session_even_names, 'parts_for_viz/resized-images/womens_suffrage_1_B.png')
+	plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_1_B.png', 'womens_suffrage_1_B_heatmap.png', parts=5)
 

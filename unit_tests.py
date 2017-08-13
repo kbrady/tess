@@ -26,7 +26,7 @@ class TestLevenshteinDistance(unittest.TestCase):
 
 	# At the moment this only considers ascii letters. We may want to change this in future.
 	def test_skipping(self):
-		log= logging.getLogger( "TestLevenshteinDistance.test_skipping" )
+		log = logging.getLogger( "TestLevenshteinDistance.test_skipping" )
 		for test_num in range(20):
 			sub_string = ""
 			for i in range(random.choice(range(20))):
@@ -64,7 +64,7 @@ def test_line_levenshteinDistance(line_string, correct_string, s2_edge_cost=.01,
 
 class TestLineAssignment(unittest.TestCase):
 
-	def test_line_assignment_test(self):
+	def test_line_assignment_sidebar(self):
 		hocr_file = 'test-data/sidebar-open.hocr'
 		correct_filename = 'digital_reading_1.txt'
 		correct_bags = ocr_cleanup.get_correct_bags()

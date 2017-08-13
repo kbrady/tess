@@ -6,6 +6,8 @@ import settings
 import os
 # to keep track of feild names
 from collections import namedtuple
+# to match session names
+import re
 
 """
 This file calculates some statistics which we cite in grants and papers
@@ -22,9 +24,16 @@ def count_fixations(filename):
 			if line_obj is None:
 				if len(row) < 10:
 					continue
-				line_obj = namedtuple('LineObj', list(row))
+				header = list(row[:30])
+				for i in range(len(header)):
+					if re.match('[^a-zA-Z].*', header[i]):
+						header[i] = 'a'+header[i]
+					header[i] = header[i].replace(' ','_')
+					header[i] = header[i].replace('#','_')
+					header[i] = header[i].replace('-','_')
+				line_obj = namedtuple('LineObj', header)
 				continue
-			row = line_obj(*tuple(row))
+			row = line_obj(*tuple(row[:30]))
 			time_count += 1
 			measurement_count += 1 if row.GazeX not in [-1,'','-1'] else 0
 	return measurement_count, time_count
@@ -43,7 +52,7 @@ def get_fixation_stats():
 			students[sess_name] = count_fixations(path + os.sep + filename)
 	return students
 
-def average_fixations(sess_name_filter=lambda x: x.find('participant') > -1):
+def average_fixations(sess_name_filter=lambda x: re.match('[0-9][0-9][0-9][0-9]', x)):
 	students = get_fixation_stats()
 	student_values = [students[k] for k in students.keys() if sess_name_filter(k)]
 	measurements, attempts = zip(*student_values)

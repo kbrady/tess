@@ -16,6 +16,10 @@ import unicodedata
 import time
 # to calculate the standard deviation of dimensions
 import numpy as np
+# to find unique words
+from collections import Counter, defaultdict
+# to save output from some functions
+import csv
 
 # to handle unicode characters that unicodedata doesn't catch
 Replacement_Dict = {u'\u2014':'-'}
@@ -31,7 +35,7 @@ class BBox:
 		if type(info) == str or type(info) == unicode:
 			info = [int(x) for x in info.split(' ')]
 		try:
-			self.right, self.top, self.left, self.bottom = info
+			self.left, self.top, self.right, self.bottom = info
 		except Exception as e:
 			print type(info)
 			print info
@@ -74,10 +78,12 @@ class Word(Part):
 		self.text = replace_unicode(self.text)
 		self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
 		self.corrected_text = None
+		# record the id from the hocr document and the ocr text
+		# so that we can audit the resulting xml document for acuracy
 		if et_parent is not None:
-			self.et = ET.SubElement(et_parent, "word", bbox=str(self.bbox), id=self.id)
+			self.et = ET.SubElement(et_parent, "word", bbox=str(self.bbox), id=self.id, ocr_text=self.text)
 		else:
-			self.et = ET.Element("word", bbox=str(self.bbox))
+			self.et = ET.Element("word", bbox=str(self.bbox), id=self.id, ocr_text=self.text)
 		self.et.text = self.text
 
 	def __repr__(self):
@@ -146,6 +152,9 @@ class Line(Part):
 
 	# I am making a line specific implementation of this so we can have fuzzy
 	# matching for substrings (the whole line is sometimes not visible due to sidebar etc.)
+	# 
+	# The problem with this solution is that smaller lines may match better than correct lines
+	# this is somewhat fixed by having a non-zero s2_edge_cost
 	def levenshteinDistance(self, s2, s2_edge_cost=.01, s2_mid_cost=1, s1_cost=1, sub_cost=1):
 		s1 = str(self)
 		if len(s1.strip()) == 0:
@@ -177,13 +186,65 @@ class Line(Part):
 		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
 		return float(min(final_distances))/len(s1)
 
-	def assign_matching(self, string):
+	def assign_matching(self, string, testing=False):
 		self.updated_line = string
-		if len(string) > 0:
-			assign(self.children, string.split(' '), complete_coverage=True)
-		else:
-			for word in self.children:
-				word.assign_matching('')
+		# we should keep track of line assignments seperately from word assignments
+		# so we can audit the results
+		self.et.set('updated_line', self.updated_line)
+		# yet again we need the ability to run test runs
+		if not testing:
+			if len(string) > 0:
+				assign(self.children, string.split(' '), complete_coverage=True)
+			else:
+				for word in self.children:
+					word.assign_matching('')
+
+	# better word assignment algorithm
+	def assign_words(self):
+		correct_words = self.updated_line.split(' ')
+		correct_word_counts = Counter(correct_words)
+		ocr_words = [c.text for c in self.children]
+		# start by findind the anchors
+		anchor_indexes = [i for i in range(len(ocr_words)) if correct_word_counts.get(ocr_words[i], 0) == 1]
+		anchor_matchings = [correct_words.index(ocr_words[i]) for i in anchor_indexes]
+		# for the moment I am throwing an error here
+		# practically I think this case most likely to occur on short lines where having no anchor wouldn't
+		# be a big deal
+		if len(anchor_indexes) == 0:
+			raise Exception('There are no anchors in '+str(self))
+		# next consider each un-anchored word chunk
+		# keep track of the next and previous anchored word
+		prev_anchor = None
+		next_anchor = anchor_indexes[0]
+		anchor_counter = 0
+		for i in range(len(self.children)):
+			# get the chunk
+			chunk = self.children[i]
+			# we do not need to considered anchored chunks
+			if i in anchor_indexes:
+				# but we do need to make assignments
+				chunk.assign_matching(correct_words[anchor_matchings[anchor_counter]])
+				# however we do need to know which anchor chunk came last and next
+				prev_anchor = i
+				anchor_counter += 1
+				next_anchor = anchor_indexes[anchor_counter] if anchor_counter < len(anchor_indexes) else None
+				continue
+			# what are the candidate words?
+			low_index = anchor_matchings[prev_anchor] + 1 if prev_anchor is not None else 0
+			# we don't need to add a -1 because the range function takes care of that for us
+			high_index = anchor_matchings[next_anchor] if next_anchor is not None else len(correct_words)
+			candidate_indexes = range(low_index, high_index)
+			# how far off are we from each candidate
+			distances = [chunk.levenshteinDistance(correct_words[j]) for j in candidate_indexes]
+			# how to make assignments without making mistakes?
+			"""
+			 NEED TO FILL IN
+			"""
+			# assign chunk
+			# it might be wiser to do this later
+			# will need to consider based on the evidece
+			chunk.assign_matching(' '.join([correct_words[j] for j in found_words]))
+			prev_anchor = i
 
 	def scale(self, right_shift, down_shift, multiple):
 		self.bbox.scale(right_shift, down_shift, multiple)
@@ -240,6 +301,47 @@ class Document:
 	def remove_line(self, line):
 		self.lines.remove(line)
 		self.root.remove(line.et)
+
+	# find the approximate width of each character.
+	# This can be used to make educated decisions about gaps.
+	# only run this function after running line assignment
+	def get_char_width(self, testing=True):
+		# only consider lines which are close to the median hight
+		med_height = np.median([l.bbox.bottom - l.bbox.top for l in self.lines])
+		height_epsilon = med_height * .1
+		# find words which don't need correction
+		perfect_words = []
+		for l in self.lines:
+			# skip non-med height lines
+			line_height = l.bbox.bottom - l.bbox.top
+			if line_height < med_height - height_epsilon or line_height > med_height + height_epsilon:
+				continue
+			# find unique words in the corrected line
+			correct_words = l.updated_line.split(' ')
+			correct_word_counts = Counter(correct_words)
+			# start by findind the anchors
+			perfect_words += [c for c in l.children if correct_word_counts.get(c.text, 0) == 1]
+		# gather the available data on each character
+		character_data_points = defaultdict(list)
+		for w in perfect_words:
+			word_width = w.bbox.right - w.bbox.left
+			word_length = len(w.text)
+			fraciton = float(word_width)/word_length
+			for c in w.text:
+				character_data_points[c].append(fraciton)
+		# calculate the average width for each character
+		char_widths = {}
+		for c in character_data_points:
+			# need a couple datapoints to be reliable
+			#if len(character_data_points[c]) >= 3:
+			char_widths[c] = np.mean(character_data_points[c])
+		# when testing it is good to see the results as a csv
+		with open('char_widths.csv', 'w') as output_file:
+			writer = csv.writer(output_file, delimiter=',', quotechar='"')
+			writer.writerow(['Char', 'Width', 'Datapoints'])
+			for c in char_widths:
+				writer.writerow([c, char_widths[c], len(character_data_points[c])])
+		return char_widths
 
 	def percent_of_initial_correct(self):
 		bag_of_lines = [str(l) for l in self.lines]
@@ -331,7 +433,7 @@ class Document:
 			if correct_line_index is None:
 				final_assignment.append((i, None))
 				continue
-			# less than 50% of the line needs to be changed
+			# less than 60% of the line needs to be changed
 			# (this may be a substring so it can actually be quite far from the correct line)
 			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
 			# short lines with lots of numbers
@@ -339,20 +441,21 @@ class Document:
 				final_assignment.append((i, correct_line_index))
 			else:
 				final_assignment.append((i, None))
-		# if this is not a test carry out the assignments. Otherwise return the result
-		if not testing:
-			# make a list of lines to delete and delete them after assigning the rest of the lines
-			# (so as not to change the indices)
-			blank_lines = []
-			for index_pair in final_assignment:
-				if index_pair[1] is not None:
-					self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]])
-				else:
-					blank_lines.append(self.lines[i])
-			# remove lines which were not matched
-			for l in blank_lines:
+		# make a list of lines to delete and delete them after assigning the rest of the lines
+		# (so as not to change the indices)
+		blank_lines = []
+		for index_pair in final_assignment:
+			if index_pair[1] is not None:
+				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], testing=testing)
+			else:
+				blank_lines.append(self.lines[i])
+		# remove lines which were not matched
+		for l in blank_lines:
+			if testing:
+				l.assign_matching('', testing=testing)
+			else:
 				self.remove_line(l)
-		else:
+		if testing:
 			conversion_fun = lambda p : (self.lines[p[0]], self.correct_lines[p[1]] if p[1] is not None else None)
 			return [conversion_fun(p) for p in final_assignment]
 
@@ -548,14 +651,9 @@ def find_percent_correct(sess):
 	print 'std:', np.std(precent_correct)
 
 if __name__ == '__main__':
-	# some session ids from the pilot data
-	all_sessions = get_session_names()
-
-	t0 = time.time()
-	for sess_name in all_sessions:
-		sess = Session(sess_name)
-		print sess_name
-		find_percent_correct(sess)
-		#cleanup(sess)
-	t1 = time.time()
-	print 'time taken', t1 - t0, 'seconds'
+	doc = Document('test-data/03-26.6.hocr', 'test-output')
+	correct_bags = get_correct_bags()
+	doc.find_correct(correct_bags)
+	doc.assign_lines(testing=True)
+	print doc.get_char_width()
+	

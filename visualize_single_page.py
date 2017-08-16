@@ -174,9 +174,9 @@ def plot_heatmap(bins, dst_img_path, output_path, parts=4):
 	boundaries = [0] + [x+.5 for x in range(len(cuttoffs))] + [parts-1]
 	cbar = fig.colorbar(cax, ticks=range(parts), boundaries=boundaries)
 	# strings to describe each bin
-	labels = ['<='+str(cuttoffs[0])]
-	labels += ['('+str(cuttoffs[i-1])+','+str(cuttoffs[i])+']' for i in range(1,len(cuttoffs))]
-	labels.append('>'+str(cuttoffs[-1]))
+	labels = ['<='+str(int(cuttoffs[0]))]
+	labels += [str(int(cuttoffs[i-1])+1)+'-'+str(int(cuttoffs[i])) for i in range(1,len(cuttoffs))]
+	labels.append('>='+str(int(cuttoffs[-1])+1))
 	cbar.ax.set_yticklabels(labels)  # vertically oriented colorbar
 	ax.set_title('Number of Fixations')
 	plt.savefig(output_path, dpi=800)

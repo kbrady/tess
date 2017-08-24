@@ -1,5 +1,6 @@
 # Trying to make doubly sure that no IRB protected data gets uploaded
 *.csv
+*.xlsx
 *.jpg
 *.JPG
 *.png

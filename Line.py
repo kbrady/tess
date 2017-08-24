@@ -7,7 +7,7 @@ import csv
 # to write corrected output to file
 import xml.etree.cElementTree as ET
 # to make word frequency vectors and store dimensions
-from collections import Counter
+from collections import Counter, defaultdict
 
 # An object to interpret lines in hocr files
 class Line(Part):
@@ -77,57 +77,120 @@ class Line(Part):
 
 	# estimate word breaks based on character distance
 	def estimate_breaks(self, testing=False):
+		# the line should have already been assigned to a correct string by this step
+		# lines that didn't match anything get a blank updated line so we should return
+		# an empty list
 		if len(self.updated_line) == 0:
 			return []
+		# split up the correct string into word chunks
 		correct_words = self.updated_line.split(' ')
-		correct_word_counts = Counter(correct_words)
-		ocr_words = [c.text for c in self.children]
-		# start by findind the anchors
-		anchor_indexes = [i for i in range(len(ocr_words)) if correct_word_counts.get(ocr_words[i], 0) == 1]
-		anchor_matchings = [correct_words.index(ocr_words[i]) for i in anchor_indexes]
-		# for the moment I am throwing an error here
-		# practically I think this case most likely to occur on short lines where having no anchor wouldn't
-		# be a big deal
-		if len(anchor_indexes) == 0:
-			raise Exception('There are no anchors in '+str(self))
 		# estimate where the word breaks should be
+		offset = self.bbox.left
 		current_point = 0
 		estimated_breaks = []
+		# go through each word in the correct string and estimate where it
+		# should start and stop based on character widths
 		for word_text in correct_words:
 			word_start = current_point
 			word_end = word_start + sum([self.doc.chr_widths[c] for c in word_text])
+			# scale lines which are not close to the median height
+			# this assumes other sized fonts are about the same
 			if not self.doc.close_to_median_height(self):
 				scale = float(self.bbox.bottom - self.bbox.top)/self.doc.med_height
 			else:
 				scale = 1.0
-			bbox_values = [word_start*scale, self.bbox.top, word_end*scale, self.bbox.bottom]
+			bbox_values = [word_start*scale + offset, self.bbox.top, word_end*scale + offset, self.bbox.bottom]
 			info = ' '.join([str(int(x)) for x in bbox_values])
 			estimated_breaks.append(BBox(info))
 			current_point = word_end + self.doc.space_width
-		# move estimates in response to data
-		#for i in range(len(correct_words)):
-		#	
 		# save results for auditing
-		with open('line_positions.csv', 'a') as output_file:
-			writer = csv.writer(output_file, delimiter=',', quotechar='"')
-			writer.writerow(['Line ID', 'Word', 'Left', 'Right', 'Actual Left', 'Actual Right', 'Left Offset', 'Right Offset'])
-			for i in range(len(correct_words)):
-				text = correct_words[i]
-				left = estimated_breaks[i].left
-				right = estimated_breaks[i].right
-				if i in anchor_matchings:
-					anchor_chunk = self.children[anchor_indexes[anchor_matchings.index(i)]]
-					a_left = anchor_chunk.bbox.left
-					a_right = anchor_chunk.bbox.right
-				else:
-					a_left = None
-					a_right = None
-				minus_or_none= lambda a, b: a-b if a is not None and b is not None else None
-				writer.writerow([self.id, text, left, right, a_left, a_right, minus_or_none(a_left,left), minus_or_none(a_right,right)])
+		if testing:
+			# Find words which have exact matches so their actual
+			# positions can be compared to the computed location
+			correct_word_counts = Counter(correct_words)
+			ocr_words = [c.text for c in self.children]
+			anchor_indexes = [i for i in range(len(ocr_words)) if correct_word_counts.get(ocr_words[i], 0) == 1]
+			anchor_matchings = [correct_words.index(ocr_words[i]) for i in anchor_indexes]
+			# append the output to a csv file
+			# I am appending so we don't have a seperate file for each line
+			with open('line_positions.csv', 'a') as output_file:
+				writer = csv.writer(output_file, delimiter=',', quotechar='"')
+				writer.writerow(['Line ID', 'Word', 'Left', 'Right', 'Actual Left', 'Actual Right', 'Left Offset', 'Right Offset'])
+				for i in range(len(correct_words)):
+					text = correct_words[i]
+					left = estimated_breaks[i].left
+					right = estimated_breaks[i].right
+					if i in anchor_matchings:
+						anchor_chunk = self.children[anchor_indexes[anchor_matchings.index(i)]]
+						a_left = anchor_chunk.bbox.left
+						a_right = anchor_chunk.bbox.right
+					else:
+						a_left = None
+						a_right = None
+					minus_or_none= lambda a, b: a-b if a is not None and b is not None else None
+					writer.writerow([self.id, text, left, right, a_left, a_right, minus_or_none(a_left,left), minus_or_none(a_right,right)])
 		return estimated_breaks
+
+	# get the inital mapping
+	def inital_mapping(self, testing=False):
+		# the line should have already been assigned to a correct string by this step
+		# lines that didn't match anything get a blank updated line so we should return
+		# a meaningless dictionary
+		if len(self.updated_line) == 0:
+			return defaultdict(list)
+		# start with an initial assignment based on estimated breaks and reject pairings which don't make sense
+		estimated_breaks = self.estimate_breaks()
+		correct_words = self.updated_line.split(' ')
+		# itterate through the list and assign matchings
+		ocr_index = 0
+		pairing = defaultdict(list)
+		for i in range(len(correct_words)):
+			est_left = estimated_breaks[i].left
+			est_right = estimated_breaks[i].right
+			# iterate through children until we are in the right balpark
+			while est_left >= self.children[ocr_index].bbox.right:
+				ocr_index += 1
+			current_word = self.children[ocr_index]
+			# check if the overlap is good. If not go to the next word
+			if ocr_index < len(self.children) - 1:
+				if est_right > current_word.bbox.right:
+					current_overlap = current_word.bbox.right - est_left
+					next_overlap = est_right - self.children[ocr_index+1].bbox.left
+					if next_overlap > current_overlap:
+						ocr_index += 1
+			pairing[ocr_index].append(i)
+		# if we are testing, save the mapping for inspection
+		if testing:
+			with open('initital_mapping.csv', 'a') as output_file:
+				writer = csv.writer(output_file, delimiter=',', quotechar='"')
+				word_ids = [self.id]
+				ocr_row = [self.id]
+				mapping_row = [self.id]
+				for ocr_index in range(len(self.children)):
+					# make a space 
+					if len(pairing[ocr_index]) == 0:
+						word_ids.append(self.children[ocr_index].id)
+						ocr_row.append(self.children[ocr_index].text)
+						mapping_row.append('')
+						continue
+					for i in range(len(pairing[ocr_index])):
+						word_ids.append(self.children[ocr_index].id)
+						ocr_row.append(self.children[ocr_index].text)
+						mapping_row.append(correct_words[pairing[ocr_index][i]])
+				# write all three rows
+				writer.writerow(word_ids)
+				writer.writerow(ocr_row)
+				writer.writerow(mapping_row)
+		return pairing
 
 	# better word assignment algorithm
 	def assign_words(self):
+		# start with an initial assignment based on estimated breaks and reject pairings which don't make sense
+		correct_words = self.updated_line.split(' ')
+		estimated_breaks = self.estimate_breaks()
+		# find anchors and don't reasign them
+		# find window of words which might correspond to each word we have
+
 		correct_words = self.updated_line.split(' ')
 		correct_word_counts = Counter(correct_words)
 		ocr_words = [c.text for c in self.children]

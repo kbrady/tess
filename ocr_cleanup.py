@@ -172,5 +172,5 @@ if __name__ == '__main__':
 	doc.assign_lines(testing=True)
 	doc.calc_char_width(testing=True)
 	for l in doc.lines:
-		l.estimate_breaks(testing=True)
+		l.inital_mapping(testing=True)
 	

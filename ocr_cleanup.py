@@ -166,11 +166,38 @@ def find_percent_correct(sess):
 	print 'std:', np.std(precent_correct)
 
 if __name__ == '__main__':
-	doc = Document('test-data/03-26.6.hocr', 'test-output')
+	doc = Document('test-data/doc-1-sidebar.hocr', 'test-output')
 	correct_bags = get_correct_bags()
 	doc.find_correct(correct_bags)
 	doc.assign_lines(testing=True)
 	doc.calc_char_width(testing=True)
+	"""
+	line_dict = dict([(l.id,l) for l in doc.lines])
+	my_line = line_dict['line_1_7']
+	pairing = my_line.initial_mapping()
+	ocr_index = 2
+	print 'start', my_line.difference_function(ocr_index, pairing)
+	for split_1 in range(len(pairing[ocr_index])+1):
+		for split_2 in range(split_1,len(pairing[ocr_index])+1):
+			print split_1, split_2, my_line.difference_function(ocr_index, pairing, split_1, split_2)
+	
+	word_dict = dict([(w.id, w) for l in doc.lines for w in l.children])
+	my_word = word_dict['word_1_36']
+	prev_word = word_dict['word_1_35']
+	next_word = word_dict['word_1_37']
+	# first test
+	
+	# calculate total distance
+	difference = prev_word.match_difference('Women Get')
+	difference += my_word.match_difference('the Vote')
+	difference += next_word.match_difference('')
+	print 'first', difference
+	# calculate total distance
+	difference = prev_word.match_difference('Women Get')
+	difference += my_word.match_difference('the')
+	difference += next_word.match_difference('Vote')
+	print 'second', difference
+	"""
 	for l in doc.lines:
-		l.inital_mapping(testing=True)
+		l.assign_words(testing=True)
 	

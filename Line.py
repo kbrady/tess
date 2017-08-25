@@ -18,7 +18,7 @@ class Line(Part):
 			self.et = ET.SubElement(et_parent, "line", bbox=str(self.bbox), id=self.id)
 		else:
 			self.et = ET.Element("line", bbox=str(self.bbox), id=self.id)
-		self.children = [Word(sub_tag, self.et) for sub_tag in tag.find_all('span', {'class':'ocrx_word'})]
+		self.children = [Word(sub_tag, self, self.et) for sub_tag in tag.find_all('span', {'class':'ocrx_word'})]
 		self.word_hist = Counter([str(c) for c in self.children])
 		self.letter_hist = Counter(str(self))
 		self.doc = doc
@@ -132,7 +132,7 @@ class Line(Part):
 		return estimated_breaks
 
 	# get the inital mapping
-	def inital_mapping(self, testing=False):
+	def initial_mapping(self, testing=False):
 		# the line should have already been assigned to a correct string by this step
 		# lines that didn't match anything get a blank updated line so we should return
 		# a meaningless dictionary
@@ -148,8 +148,11 @@ class Line(Part):
 			est_left = estimated_breaks[i].left
 			est_right = estimated_breaks[i].right
 			# iterate through children until we are in the right balpark
-			while est_left >= self.children[ocr_index].bbox.right:
+			while ocr_index < len(self.children) and est_left >= self.children[ocr_index].bbox.right:
 				ocr_index += 1
+			# if we have gotten to the end of the line there is nothing more to be done
+			if ocr_index >= len(self.children):
+				break
 			current_word = self.children[ocr_index]
 			# check if the overlap is good. If not go to the next word
 			if ocr_index < len(self.children) - 1:
@@ -161,81 +164,107 @@ class Line(Part):
 			pairing[ocr_index].append(i)
 		# if we are testing, save the mapping for inspection
 		if testing:
-			with open('initital_mapping.csv', 'a') as output_file:
+			with open('initial_mapping.csv', 'a') as output_file:
 				writer = csv.writer(output_file, delimiter=',', quotechar='"')
 				word_ids = [self.id]
 				ocr_row = [self.id]
 				mapping_row = [self.id]
 				for ocr_index in range(len(self.children)):
-					# make a space 
-					if len(pairing[ocr_index]) == 0:
-						word_ids.append(self.children[ocr_index].id)
-						ocr_row.append(self.children[ocr_index].text)
-						mapping_row.append('')
-						continue
-					for i in range(len(pairing[ocr_index])):
-						word_ids.append(self.children[ocr_index].id)
-						ocr_row.append(self.children[ocr_index].text)
-						mapping_row.append(correct_words[pairing[ocr_index][i]])
+					# record the pairing
+					word_ids.append(self.children[ocr_index].id)
+					ocr_row.append(self.children[ocr_index].text)
+					mapping_row.append(' '.join([correct_words[i] for i in pairing[ocr_index]]))
 				# write all three rows
 				writer.writerow(word_ids)
 				writer.writerow(ocr_row)
 				writer.writerow(mapping_row)
 		return pairing
 
+	def difference_function(self, chunk_string_assignments):
+		difference = 0
+		for pair in range(len(chunk_string_assignments)):
+			difference += pair[0].match_difference(pair[1])
+		return difference
+
+	def push_out(self, chunk_index, current_pairing, split_1=None, split_2=None):
+		# I don't do a complete search to find if the splits are valid,
+		# but this might be a hard one to catch
+		if split_2 < split_1:
+			raise Exception('split_1 < split_2 but '+str(split_1)+' > '+str(split_2))
+		# get the correct words
+		correct_words = self.updated_line.split(' ')
+		# make a function to pull out word strings
+		indexes_to_words = lambda ocr_index : [correct_words[i] for i in current_pairing[ocr_index]]
+		# get the words currently assigned to the current chunk
+		current_words = indexes_to_words(chunk_index)
+		split_1 = 0 if split_1 is None else split_1
+		split_2 = len(current_words) if split_2 is None else split_2
+		# calculate the string for each chunk
+		chunk_string_assignments = [(self.children[chunk_index], ' '.join(current_words[split_1:split_2]))]
+		if chunk_index > 0:
+			prev_string = ' '.join(indexes_to_words(chunk_index - 1) + current_words[:split_1])
+			chunk_string_assignments.append((self.children[chunk_index - 1], prev_string))
+		if chunk_index + 1 < len(self.children):
+			next_string = ' '.join(current_words[split_2:] + indexes_to_words(chunk_index + 1))
+			chunk_string_assignments.append((self.children[chunk_index + 1], next_string))
+		return self.difference_function(chunk_string_assignments)
+
 	# better word assignment algorithm
-	def assign_words(self):
-		# start with an initial assignment based on estimated breaks and reject pairings which don't make sense
-		correct_words = self.updated_line.split(' ')
-		estimated_breaks = self.estimate_breaks()
-		# find anchors and don't reasign them
-		# find window of words which might correspond to each word we have
-
-		correct_words = self.updated_line.split(' ')
-		correct_word_counts = Counter(correct_words)
-		ocr_words = [c.text for c in self.children]
-		# start by findind the anchors
-		anchor_indexes = [i for i in range(len(ocr_words)) if correct_word_counts.get(ocr_words[i], 0) == 1]
-		anchor_matchings = [correct_words.index(ocr_words[i]) for i in anchor_indexes]
-		# for the moment I am throwing an error here
-		# practically I think this case most likely to occur on short lines where having no anchor wouldn't
-		# be a big deal
-		if len(anchor_indexes) == 0:
-			raise Exception('There are no anchors in '+str(self))
-		# next consider each un-anchored word chunk
-		# keep track of the next and previous anchored word
-		prev_anchor = None
-		next_anchor = anchor_indexes[0]
-		anchor_counter = 0
-		for i in range(len(self.children)):
-			# get the chunk
-			chunk = self.children[i]
-			# we do not need to considered anchored chunks
-			if i in anchor_indexes:
-				# but we do need to make assignments
-				chunk.assign_matching(correct_words[anchor_matchings[anchor_counter]])
-				# however we do need to know which anchor chunk came last and next
-				prev_anchor = i
-				anchor_counter += 1
-				next_anchor = anchor_indexes[anchor_counter] if anchor_counter < len(anchor_indexes) else None
-				continue
-			# what are the candidate words?
-			low_index = anchor_matchings[prev_anchor] + 1 if prev_anchor is not None else 0
-			# we don't need to add a -1 because the range function takes care of that for us
-			high_index = anchor_matchings[next_anchor] if next_anchor is not None else len(correct_words)
-			candidate_indexes = range(low_index, high_index)
-			# how far off are we from each candidate
-			distances = [chunk.levenshteinDistance(correct_words[j]) for j in candidate_indexes]
-
-			# how to make assignments without making mistakes?
-			"""
-			 NEED TO FILL IN
-			"""
-			# assign chunk
-			# it might be wiser to do this later
-			# will need to consider based on the evidece
-			chunk.assign_matching(' '.join([correct_words[j] for j in found_words]))
-			prev_anchor = i
+	def assign_words(self, testing=False):
+		# start with an initial assignment based on estimated breaks
+		# and reject pairings which don't make sense
+		pairing = self.initial_mapping()
+		# We make changes by "shoving" the inital pairing around.
+		# In this case repeatedly make new splits and try to find a stable solution
+		change = True
+		iterations = 0
+		# currently we are falling into loops. Need to think of way to fix
+		while change and iterations < 20:
+			iterations += 1
+			change = False
+			for ocr_index in range(len(self.children)-1,0,-1):
+				# we can put two paritions in the current chunk's assignment to try and make something better
+				# initialize the best split
+				best_split = (0, len(pairing[ocr_index]))
+				best_difference = self.difference_function(ocr_index, pairing)
+				for split_1 in range(len(pairing[ocr_index])+1):
+					for split_2 in range(split_1,len(pairing[ocr_index])+1):
+						difference = self.push_out(ocr_index, pairing, split_1, split_2)
+						# if we have found a better split record it and do an update at the end
+						if difference < best_difference:
+							best_difference = difference
+							best_split = (split_1, split_2)
+				# if we found a better split make the update
+				if best_split != (0, len(pairing[ocr_index])):
+					new_prev = pairing[ocr_index - 1] + pairing[ocr_index][:best_split[0]]
+					new_next = pairing[ocr_index][best_split[1]:] + pairing[ocr_index + 1]
+					new_current = pairing[ocr_index][best_split[0]:best_split[1]]
+					if ocr_index > 0:
+						pairing[ocr_index - 1] = new_prev
+					if ocr_index < len(self.children):
+						pairing[ocr_index + 1] = new_next
+					pairing[ocr_index] = new_current
+					change = True
+		# if we are testing, save the mapping for inspection
+		if testing:
+			# get the correct words (we only need these in the test case)
+			correct_words = self.updated_line.split(' ')
+			with open('final_mapping.csv', 'a') as output_file:
+				writer = csv.writer(output_file, delimiter=',', quotechar='"')
+				word_ids = [self.id]
+				ocr_row = [self.id]
+				mapping_row = [self.id]
+				for ocr_index in range(len(self.children)):
+					# record the pairing
+					word_ids.append(self.children[ocr_index].id)
+					ocr_row.append(self.children[ocr_index].text)
+					mapping_row.append(' '.join([correct_words[i] for i in pairing[ocr_index]]))
+				# write all three rows
+				writer.writerow([iterations])
+				writer.writerow(word_ids)
+				writer.writerow(ocr_row)
+				writer.writerow(mapping_row)
+		return pairing
 
 	def scale(self, right_shift, down_shift, multiple):
 		self.bbox.scale(right_shift, down_shift, multiple)

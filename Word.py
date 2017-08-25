@@ -14,13 +14,16 @@ def replace_unicode(text):
 
 # An object to interpret words in hocr files
 class Word(Part):
-	def __init__(self, tag, et_parent=None):
+	def __init__(self, tag, line, et_parent=None):
 		super(self.__class__, self).__init__(tag)
 		# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
 		self.text = tag.get_text()
 		self.text = replace_unicode(self.text)
 		self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
 		self.corrected_text = None
+		# save a path to the parent line which will give access to the document
+		# this allows us to use document level statistics such as the width of characters
+		self.line = line
 		# record the id from the hocr document and the ocr text
 		# so that we can audit the resulting xml document for acuracy
 		if et_parent is not None:
@@ -40,7 +43,7 @@ class Word(Part):
 	# string is the correct one
 	def levenshteinDistance(self, s1, s2_edge_cost=.01, s2_mid_cost=1, s1_cost=1, sub_cost=1):
 		s2 = str(self)
-		if len(s2.strip()) == 0:
+		if len(s1.strip()) == 0:
 			return 1.0
 		# if we are matching lines we are interested in sub-strings
 		# but in the word case it costs us more to add letters to
@@ -66,7 +69,20 @@ class Word(Part):
 			distances = distances_
 		# we need a final row on the bottom like the one on the top to add the cost of edge skips at the end
 		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
-		return float(min(final_distances))/len(s1)
+		return min(final_distances)
+
+	# a function to calculate the similarity between this chunk and the text it is matched to
+	# This takes into account both string similarity and the relative widths of the word and
+	# the string it is matched to
+	def match_difference(self, match_string):
+		# calculate the string distance
+		string_distance = self.levenshteinDistance(match_string, s2_edge_cost=1, s2_mid_cost=1, s1_cost=1, sub_cost=1)
+		# calculate the width distance
+		scale = 1.0 if self.line.doc.close_to_median_height(self) else float(self.height())/self.line.doc.med_height
+		estimated_width = sum([self.line.doc.chr_widths[c] for c in match_string]) * scale
+		width_distance = abs(self.width() - estimated_width)
+		# We should care much more about string distance than width
+		return float(width_distance) * .1 + string_distance
 
 	def assign_matching(self, text):
 		self.corrected_text = text

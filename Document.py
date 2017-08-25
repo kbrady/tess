@@ -38,7 +38,7 @@ class Document:
 		self.med_height = np.median([l.bbox.bottom - l.bbox.top for l in self.lines])
 		height_epsilon = self.med_height * .1
 		inside_bounds = lambda x, y, eps: x >= y - eps and x <= y + eps
-		inside_height = lambda x, y, eps: inside_bounds(x.bbox.bottom - x.bbox.top, y, eps)
+		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
 		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
 		# calculate the median space width so it can be used in analysis
 		self.calc_space_width()
@@ -48,18 +48,22 @@ class Document:
 
 	def find_correct(self, correct_bags=None):
 		bag_of_lines = [str(l) for l in self.lines]
+		best_match = None
+		similarity = 0
 		for correct_filename in correct_bags:
-			num_same = len(set(correct_bags[correct_filename]) & set(bag_of_lines))
-			perc_same = float(num_same)/len(bag_of_lines)
-			# may need to work on cuttoff
-			if perc_same > .1:
-				self.assign_correct_bag(correct_filename, correct_bags[correct_filename])
-				return correct_filename, correct_bags[correct_filename]
-		print str(self)
-		for correct_filename in correct_bags:
-			num_same = len(set(correct_bags[correct_filename]) & set(bag_of_lines))
-			perc_same = float(num_same)/len(bag_of_lines)
-			print perc_same
+			matches = 0
+			for ocr_line in bag_of_lines:
+				for correct_line in correct_bags[correct_filename]:
+					if correct_line.find(ocr_line) > -1:
+						matches += 1
+			if matches > similarity:
+				best_match = correct_filename
+				similarity = matches
+		# match to the closest match
+		if best_match is not None:
+			self.assign_correct_bag(correct_filename, correct_bags[correct_filename])
+			return best_match, correct_bags[correct_filename]
+		# if there were no matches raise an exception
 		raise Exception('Could not find file match for '+self.tesseract_file)
 
 	def assign_correct_bag(self, correct_filename, correct_lines):

@@ -182,7 +182,7 @@ class Line(Part):
 
 	def difference_function(self, chunk_string_assignments):
 		difference = 0
-		for pair in range(len(chunk_string_assignments)):
+		for pair in chunk_string_assignments:
 			difference += pair[0].match_difference(pair[1])
 		return difference
 
@@ -209,6 +209,68 @@ class Line(Part):
 			chunk_string_assignments.append((self.children[chunk_index + 1], next_string))
 		return self.difference_function(chunk_string_assignments)
 
+	# in this case we need to report the distance before and the distance after
+	# since the difference for the chunk being pulled from must also be considered
+	def pull_in(self, chunk_index, current_pairing, from_right=True):
+		# if the line is empty don't bother
+		if len(self.updated_line) == 0 or len([v for l in current_pairing.values() for v in l]) == 0:
+			return 0, 0, None, None
+		# get the correct words
+		correct_words = self.updated_line.split(' ')
+		# make a function to pull out word strings
+		indexes_to_words = lambda ocr_index : [correct_words[i] for i in current_pairing[ocr_index]]
+		# find the next word
+		next_ocr_index = None
+		# if we are coming from the right, only consider chunks with lower indexes
+		# from the left only consider chunks with higher indexes
+		ocr_index_list = range(chunk_index-1,-1,-1) if from_right else range(chunk_index+1, len(self.children))
+		# find the first chunk which is not empty
+		for index_to_check in ocr_index_list:
+			if len(current_pairing[index_to_check]) > 0:
+				next_ocr_index = index_to_check
+				break
+		# if there is no word in a chunk after or before this one, try pulling off screen words from correct_words
+		if next_ocr_index is None:
+			try:
+				# if there is nothing to the right of this word, the first off screen word will
+				# have a smaller index than those on screen
+				if from_right:
+					next_correct_index = min([v for l in current_pairing.values() for v in l]) - 1
+				# if there is nothing to the left of this word, the first off screen word will
+				# have a larger index than those on screen
+				else:
+					next_correct_index = max([v for l in current_pairing.values() for v in l]) + 1
+			except Exception as e:
+				print current_pairing
+				print self.updated_line
+				print self
+				print self.id
+				raise e
+			# if there is nothing off screen, return None
+			if next_correct_index >= len(correct_words) or next_correct_index < 0:
+				return 0, 0, None, None
+			# if there is something off screen, consider pulling it on
+			word_to_try = correct_words[next_correct_index]
+			difference_before = self.difference_function([(self.children[chunk_index], '')])
+			difference_after = self.difference_function([(self.children[chunk_index], word_to_try)])
+			return difference_before, difference_after, next_correct_index, None
+		else:
+			# have something to compare to
+			difference_before = self.difference_function([(self.children[chunk_index], '')])
+			next_string = ' '.join(indexes_to_words(next_ocr_index))
+			difference_before += self.difference_function([(self.children[next_ocr_index], next_string)])
+			# measure in the case where we change something
+			if from_right:
+				next_correct_index = current_pairing[next_ocr_index][-1]
+			else:
+				next_correct_index = current_pairing[next_ocr_index][0]
+			word_to_try = correct_words[next_correct_index]
+			next_string = ' '.join([correct_words[i] for i in current_pairing[next_ocr_index][1:]])
+			chunk_string_assignments = [(self.children[chunk_index], word_to_try)]
+			chunk_string_assignments.append((self.children[next_ocr_index], next_string))
+			difference_after = self.difference_function(chunk_string_assignments)
+			return difference_before, difference_after, next_correct_index, next_ocr_index
+
 	# better word assignment algorithm
 	def assign_words(self, testing=False):
 		# start with an initial assignment based on estimated breaks
@@ -223,28 +285,55 @@ class Line(Part):
 			iterations += 1
 			change = False
 			for ocr_index in range(len(self.children)-1,0,-1):
-				# we can put two paritions in the current chunk's assignment to try and make something better
-				# initialize the best split
-				best_split = (0, len(pairing[ocr_index]))
-				best_difference = self.difference_function(ocr_index, pairing)
-				for split_1 in range(len(pairing[ocr_index])+1):
-					for split_2 in range(split_1,len(pairing[ocr_index])+1):
-						difference = self.push_out(ocr_index, pairing, split_1, split_2)
-						# if we have found a better split record it and do an update at the end
-						if difference < best_difference:
-							best_difference = difference
-							best_split = (split_1, split_2)
-				# if we found a better split make the update
-				if best_split != (0, len(pairing[ocr_index])):
-					new_prev = pairing[ocr_index - 1] + pairing[ocr_index][:best_split[0]]
-					new_next = pairing[ocr_index][best_split[1]:] + pairing[ocr_index + 1]
-					new_current = pairing[ocr_index][best_split[0]:best_split[1]]
-					if ocr_index > 0:
-						pairing[ocr_index - 1] = new_prev
-					if ocr_index < len(self.children):
-						pairing[ocr_index + 1] = new_next
-					pairing[ocr_index] = new_current
-					change = True
+				# if the chunk is empty, consider pulling words in
+				if len(pairing[ocr_index]) == 0:
+					best_word_index = None
+					pulled_from = None
+					right_before, right_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, True)
+					if right_before > right_after:
+						best_word_index = word_candidate
+						pulled_from = ocr_candidate
+					left_before, left_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, False)
+					if left_before > left_after and left_before - left_after > right_before - right_after:
+						best_word_index = word_candidate
+						pulled_from = ocr_candidate
+					# if either pull successfully found a better position update the pairing
+					if best_word_index is not None:
+						pairing[ocr_index] = [best_word_index]
+						if pulled_from is not None:
+							if ocr_index < pulled_from:
+								pairing[pulled_from] = pairing[pulled_from][1:]
+							else:
+								pairing[pulled_from] = pairing[pulled_from][:-1]
+						change = True
+				# otherwise try to push words out or sideways
+				else:
+					# we can put two paritions in the current chunk's assignment to try and make something better
+					# initialize the best split
+					best_split = (0, len(pairing[ocr_index]))
+					best_difference = self.push_out(ocr_index, pairing)
+					for split_1 in range(len(pairing[ocr_index])+1):
+						for split_2 in range(split_1,len(pairing[ocr_index])+1):
+							difference = self.push_out(ocr_index, pairing, split_1, split_2)
+							# if we have found a better split record it and do an update at the end
+							if difference < best_difference:
+								if self.children[ocr_index].id == 'word_1_43':
+									print best_difference
+									print difference
+									print str((split_1, split_2))
+								best_difference = difference
+								best_split = (split_1, split_2)
+					# if we found a better split make the update
+					if best_split != (0, len(pairing[ocr_index])):
+						new_prev = pairing[ocr_index - 1] + pairing[ocr_index][:best_split[0]]
+						new_next = pairing[ocr_index][best_split[1]:] + pairing[ocr_index + 1]
+						new_current = pairing[ocr_index][best_split[0]:best_split[1]]
+						if ocr_index > 0:
+							pairing[ocr_index - 1] = new_prev
+						if ocr_index + 1 < len(self.children):
+							pairing[ocr_index + 1] = new_next
+						pairing[ocr_index] = new_current
+						change = True
 		# if we are testing, save the mapping for inspection
 		if testing:
 			# get the correct words (we only need these in the test case)

@@ -44,7 +44,7 @@ class Word(Part):
 	def levenshteinDistance(self, s1, s2_edge_cost=.01, s2_mid_cost=1, s1_cost=1, sub_cost=1):
 		s2 = str(self)
 		if len(s1.strip()) == 0:
-			return 1.0
+			return len(s2)*s2_edge_cost
 		# if we are matching lines we are interested in sub-strings
 		# but in the word case it costs us more to add letters to
 		# s1 (this string) than s2 (the word)
@@ -57,7 +57,7 @@ class Word(Part):
 			# cost of starting here and skipping the rest of s2
 			distances_ = [distances[0] + cost_of_skipping_s1_letters]
 			for i2, c2 in enumerate(s2):
-				if c1 == c2:
+				if c1.lower() == c2.lower():
 					# indexes are off by one since we start with the null position so this is
 					# actually the value diaganally upwards from the current position
 					distances_.append(distances[i2])
@@ -82,7 +82,7 @@ class Word(Part):
 		estimated_width = sum([self.line.doc.chr_widths[c] for c in match_string]) * scale
 		width_distance = abs(self.width() - estimated_width)
 		# We should care much more about string distance than width
-		return float(width_distance) * .1 + string_distance
+		return string_distance # float(width_distance) * .1 + string_distance
 
 	def assign_matching(self, text):
 		self.corrected_text = text

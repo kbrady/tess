@@ -171,10 +171,12 @@ if __name__ == '__main__':
 	doc.find_correct(correct_bags)
 	doc.assign_lines(testing=True)
 	doc.calc_char_width(testing=True)
+
 	"""
 	line_dict = dict([(l.id,l) for l in doc.lines])
-	my_line = line_dict['line_1_7']
-	pairing = my_line.initial_mapping()
+	my_line = line_dict['line_1_24']
+	#pairing = my_line.initial_mapping()
+	my_line.assign_words(testing=True)
 	ocr_index = 2
 	print 'start', my_line.difference_function(ocr_index, pairing)
 	for split_1 in range(len(pairing[ocr_index])+1):

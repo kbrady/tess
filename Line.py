@@ -211,9 +211,10 @@ class Line(Part):
 
 	# in this case we need to report the distance before and the distance after
 	# since the difference for the chunk being pulled from must also be considered
-	def pull_in(self, chunk_index, current_pairing, from_right=True):
+	# I confused left and right and should fix this...
+	def pull_in(self, chunk_index, current_pairing, from_left=True):
 		# if the line is empty don't bother
-		if len(self.updated_line) == 0 or len([v for l in current_pairing.values() for v in l]) == 0:
+		if len(self.updated_line) == 0:
 			return 0, 0, None, None
 		# get the correct words
 		correct_words = self.updated_line.split(' ')
@@ -223,29 +224,30 @@ class Line(Part):
 		next_ocr_index = None
 		# if we are coming from the right, only consider chunks with lower indexes
 		# from the left only consider chunks with higher indexes
-		ocr_index_list = range(chunk_index-1,-1,-1) if from_right else range(chunk_index+1, len(self.children))
+		ocr_index_list = range(chunk_index-1,-1,-1) if from_left else range(chunk_index+1, len(self.children))
 		# find the first chunk which is not empty
 		for index_to_check in ocr_index_list:
 			if len(current_pairing[index_to_check]) > 0:
 				next_ocr_index = index_to_check
 				break
-		# if there is no word in a chunk after or before this one, try pulling off screen words from correct_words
+		# if there is no word in a chunk after or before this one,
+		# try pulling off screen words from correct_words
 		if next_ocr_index is None:
-			try:
-				# if there is nothing to the right of this word, the first off screen word will
-				# have a smaller index than those on screen
-				if from_right:
-					next_correct_index = min([v for l in current_pairing.values() for v in l]) - 1
-				# if there is nothing to the left of this word, the first off screen word will
-				# have a larger index than those on screen
+			values_in_pairing = [v for l in current_pairing.values() for v in l]
+			# if there is nothing to the left of this word, the first off screen word will
+			# have a smaller index than those on screen
+			if from_left:
+				if len(values_in_pairing) == 0:
+					next_correct_index = len(correct_words) - 1
 				else:
-					next_correct_index = max([v for l in current_pairing.values() for v in l]) + 1
-			except Exception as e:
-				print current_pairing
-				print self.updated_line
-				print self
-				print self.id
-				raise e
+					next_correct_index = min(values_in_pairing) - 1
+			# if there is nothing to the right of this word, the first off screen word will
+			# have a larger index than those on screen
+			else:
+				if len(values_in_pairing) == 0:
+					next_correct_index = 0
+				else:
+					next_correct_index = max(values_in_pairing) + 1
 			# if there is nothing off screen, return None
 			if next_correct_index >= len(correct_words) or next_correct_index < 0:
 				return 0, 0, None, None
@@ -260,7 +262,7 @@ class Line(Part):
 			next_string = ' '.join(indexes_to_words(next_ocr_index))
 			difference_before += self.difference_function([(self.children[next_ocr_index], next_string)])
 			# measure in the case where we change something
-			if from_right:
+			if from_left:
 				next_correct_index = current_pairing[next_ocr_index][-1]
 			else:
 				next_correct_index = current_pairing[next_ocr_index][0]
@@ -272,10 +274,10 @@ class Line(Part):
 			return difference_before, difference_after, next_correct_index, next_ocr_index
 
 	# better word assignment algorithm
-	def assign_words(self, testing=False):
+	def fix_pairing(self, initial_pairing):
 		# start with an initial assignment based on estimated breaks
 		# and reject pairings which don't make sense
-		pairing = self.initial_mapping()
+		pairing = initial_pairing
 		# We make changes by "shoving" the inital pairing around.
 		# In this case repeatedly make new splits and try to find a stable solution
 		change = True
@@ -289,11 +291,11 @@ class Line(Part):
 				if len(pairing[ocr_index]) == 0:
 					best_word_index = None
 					pulled_from = None
-					right_before, right_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, True)
+					right_before, right_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, False)
 					if right_before > right_after:
 						best_word_index = word_candidate
 						pulled_from = ocr_candidate
-					left_before, left_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, False)
+					left_before, left_after, word_candidate, ocr_candidate = self.pull_in(ocr_index, pairing, True)
 					if left_before > left_after and left_before - left_after > right_before - right_after:
 						best_word_index = word_candidate
 						pulled_from = ocr_candidate
@@ -334,6 +336,43 @@ class Line(Part):
 							pairing[ocr_index + 1] = new_next
 						pairing[ocr_index] = new_current
 						change = True
+		return pairing
+
+	def get_pairing_difference(self, pairing):
+		# get the correct words
+		correct_words = self.updated_line.split(' ')
+		# make a function to pull out word strings
+		ocr_index_to_string = lambda ocr_index : ' '.join([correct_words[i] for i in pairing[ocr_index]])
+		# make a zipped list of keys and strings
+		chunk_string_assignments = [(self.children[i], ocr_index_to_string(i)) for i in range(len(self.children))]
+		return self.difference_function(chunk_string_assignments)
+
+	# try moving everything in a pairing to the side to see if it leads to better hill climbing
+	def shove_to_side(self, pairing, offset):
+		new_pairing = defaultdict(list)
+		for key in pairing:
+			offset_key = key + offset
+			if offset_key >= 0 and offset_key < self.children:
+				new_pairing[offset_key] = pairing[key]
+		return new_pairing
+
+	def assign_words(self, testing=False):
+		initial_pairing = self.initial_mapping()
+		pairing = self.shove_to_side(initial_pairing, 0)
+		pairing = self.fix_pairing(pairing)
+		best_difference = self.get_pairing_difference(pairing)
+		best_offset = 0
+		# find out if we would get something better if we started with a different initial state
+		for offset in [-6, -4, -2, 2, 4, 6]:
+			offset_pairing = self.shove_to_side(initial_pairing, offset)
+			offset_pairing = self.fix_pairing(offset_pairing)
+			difference = self.get_pairing_difference(offset_pairing)
+			# if a pairing which started with an offset is better
+			# save it
+			if difference < best_difference:
+				best_difference = difference
+				best_offset = offset
+				pairing = offset_pairing
 		# if we are testing, save the mapping for inspection
 		if testing:
 			# get the correct words (we only need these in the test case)
@@ -349,7 +388,7 @@ class Line(Part):
 					ocr_row.append(self.children[ocr_index].text)
 					mapping_row.append(' '.join([correct_words[i] for i in pairing[ocr_index]]))
 				# write all three rows
-				writer.writerow([iterations])
+				writer.writerow([best_offset])
 				writer.writerow(word_ids)
 				writer.writerow(ocr_row)
 				writer.writerow(mapping_row)

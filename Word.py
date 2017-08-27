@@ -82,6 +82,7 @@ class Word(Part):
 		estimated_width = sum([self.line.doc.chr_widths[c] for c in match_string]) * scale
 		width_distance = abs(self.width() - estimated_width)
 		# We should care much more about string distance than width
+		# I think maybe string distance is all that matters since the initial guess is based on width
 		return string_distance # float(width_distance) * .1 + string_distance
 
 	def assign_matching(self, text):

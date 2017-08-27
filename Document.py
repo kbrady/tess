@@ -254,6 +254,27 @@ class Document:
 				final_assignment.append((i, correct_line_index))
 			else:
 				final_assignment.append((i, None))
+		# clean up final assignment so correct line is assigned to more than one OCR line
+		correct_line_assignment_count = defaultdict(list)
+		for pair in final_assignment:
+			correct_line_assignment_count[pair[1]].append(pair[0])
+		for correct_line_index in correct_line_assignment_count:
+			if correct_line_index is None:
+				continue
+			if len(correct_line_assignment_count[correct_line_index]) > 1:
+				# find the line which is closest to the assigned line
+				best_index = correct_line_assignment_count[correct_line_index][0]
+				best_distance = self.lines[best_index].levenshteinDistance(self.correct_lines[correct_line_index])
+				for i in correct_line_assignment_count[correct_line_index][1:]:
+					distance = self.lines[i].levenshteinDistance(self.correct_lines[correct_line_index])
+					if distance < best_distance:
+						best_distance = distance
+						best_index = i
+				# assign the correct line and void all others
+				for i in correct_line_assignment_count[correct_line_index]:
+					if i != best_index:
+						final_assignment.remove((i, correct_line_index))
+						final_assignment.append((i, None))
 		# make a list of lines to delete and delete them after assigning the rest of the lines
 		# (so as not to change the indices)
 		blank_lines = []

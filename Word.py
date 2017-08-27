@@ -76,7 +76,9 @@ class Word(Part):
 	# the string it is matched to
 	def match_difference(self, match_string):
 		# calculate the string distance
-		string_distance = self.levenshteinDistance(match_string, s2_edge_cost=1, s2_mid_cost=1, s1_cost=1, sub_cost=1)
+		# we would rather have blank words than words which are only correct for 1 out of 20 letters
+		# so I am using .8 for the edge cost
+		string_distance = self.levenshteinDistance(match_string, s2_edge_cost=.8, s2_mid_cost=1, s1_cost=1, sub_cost=1)
 		# calculate the width distance
 		scale = 1.0 if self.line.doc.close_to_median_height(self) else float(self.height())/self.line.doc.med_height
 		estimated_width = sum([self.line.doc.chr_widths[c] for c in match_string]) * scale

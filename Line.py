@@ -274,7 +274,7 @@ class Line(Part):
 			return difference_before, difference_after, next_correct_index, next_ocr_index
 
 	# better word assignment algorithm
-	def fix_pairing(self, initial_pairing):
+	def fix_pairing(self, initial_pairing, testing=False):
 		# start with an initial assignment based on estimated breaks
 		# and reject pairings which don't make sense
 		pairing = initial_pairing
@@ -286,7 +286,9 @@ class Line(Part):
 		while change and iterations < 20:
 			iterations += 1
 			change = False
-			for ocr_index in range(len(self.children)-1,0,-1):
+			# the initial estimate tends to favor the left side so we favor the right side when fixing
+			# this is do to the growing error term for the total character width estimate
+			for ocr_index in range(len(self.children)-1,-1,-1):
 				# if the chunk is empty, consider pulling words in
 				if len(pairing[ocr_index]) == 0:
 					best_word_index = None
@@ -319,10 +321,6 @@ class Line(Part):
 							difference = self.push_out(ocr_index, pairing, split_1, split_2)
 							# if we have found a better split record it and do an update at the end
 							if difference < best_difference:
-								if self.children[ocr_index].id == 'word_1_43':
-									print best_difference
-									print difference
-									print str((split_1, split_2))
 								best_difference = difference
 								best_split = (split_1, split_2)
 					# if we found a better split make the update
@@ -336,6 +334,25 @@ class Line(Part):
 							pairing[ocr_index + 1] = new_next
 						pairing[ocr_index] = new_current
 						change = True
+			# if we are testing, save the mapping for inspection
+			if testing:
+				# get the correct words (we only need these in the test case)
+				correct_words = self.updated_line.split(' ')
+				with open('fixed_mapping.csv', 'a') as output_file:
+					writer = csv.writer(output_file, delimiter=',', quotechar='"')
+					word_ids = [self.id]
+					ocr_row = [self.id]
+					mapping_row = [self.id]
+					for ocr_index in range(len(self.children)):
+						# record the pairing
+						word_ids.append(self.children[ocr_index].id)
+						ocr_row.append(self.children[ocr_index].text)
+						mapping_row.append(' '.join([correct_words[i] for i in pairing[ocr_index]]))
+					# write all three rows
+					writer.writerow([iterations])
+					writer.writerow(word_ids)
+					writer.writerow(ocr_row)
+					writer.writerow(mapping_row)
 		return pairing
 
 	def get_pairing_difference(self, pairing):

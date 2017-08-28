@@ -212,17 +212,16 @@ class Document:
 		right_dimensions = Dimensions(min(right_points), max(right_points), reasonable_deviation(right_points, left_points))
 		left_dimensions = Dimensions(min(left_points), max(left_points), reasonable_deviation(left_points, right_points))
 		# make a list of the assignments to be carried out which can be looked at seperately by the tester
-		final_assignment = []
+		final_assignment = [-1] * len(self.lines)
 		# fill in missing lines (for the moment assume no mistakes with the original matching step)
 		for i, line_match_i in enumerate(line_assignments):
 			if line_match_i != -1:
-				final_assignment.append((i, line_match_i))
+				final_assignment[i] = line_match_i
 				continue
 			# I need to do something to prevent highlights from being seen as part of the text
 			# However just rejecting things which are abnormally sized doesn't work because titles will
 			# be rejected.
 			low_index, high_index = self.find_line_to_assign(line_assignments, i)
-			#print self.lines[i].id, low_index, high_index
 			distance = 1.0
 			correct_line_index = None
 			# look through candidates for the most likely match
@@ -235,19 +234,19 @@ class Document:
 					correct_line_index = line_index
 			# if a good candidate couldn't be found, blank the line
 			if correct_line_index is None:
-				final_assignment.append((i, None))
+				final_assignment[i] = None
 				continue
 			# less than 80% of the line needs to be changed
 			# (this may be a substring so it can actually be quite far from the correct line)
 			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
 			# short lines with lots of numbers
 			if distance < .6:
-				final_assignment.append((i, correct_line_index))
+				final_assignment[i] = correct_line_index
 			else:
-				final_assignment.append((i, None))
+				final_assignment[i] = None
 		# clean up final assignment so correct line is assigned to more than one OCR line
 		correct_line_assignment_count = defaultdict(list)
-		for pair in final_assignment:
+		for pair in enumerate(final_assignment):
 			correct_line_assignment_count[pair[1]].append(pair[0])
 		for correct_line_index in correct_line_assignment_count:
 			if correct_line_index is None:
@@ -264,25 +263,31 @@ class Document:
 				# assign the correct line and void all others
 				for i in correct_line_assignment_count[correct_line_index]:
 					if i != best_index:
-						final_assignment.remove((i, correct_line_index))
-						final_assignment.append((i, None))
+						final_assignment[i] = None
 		# make a list of lines to delete and delete them after assigning the rest of the lines
 		# (so as not to change the indices)
 		blank_lines = []
-		for index_pair in final_assignment:
+		for index_pair in enumerate(final_assignment):
 			if index_pair[1] is not None:
-				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], testing=testing)
+				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], testing=True)
 			else:
-				blank_lines.append(self.lines[i])
+				blank_lines.append(self.lines[index_pair[0]])
 		# remove lines which were not matched
 		for l in blank_lines:
-			if testing:
-				l.assign_matching('', testing=testing)
+			if True:
+				l.assign_matching('', testing=True)
 			else:
 				self.remove_line(l)
 		if testing:
-			conversion_fun = lambda p : (self.lines[p[0]], self.correct_lines[p[1]] if p[1] is not None else None)
-			return [conversion_fun(p) for p in final_assignment]
+			with open('line_assignment.csv', 'w') as outputfile:
+				writer = csv.writer(outputfile, delimiter=',', quotechar='"')
+				for pair in enumerate(final_assignment):
+					writer.writerow([self.lines[pair[0]].id])
+					writer.writerow([str(self.lines[pair[0]])])
+					if pair[1] is None:
+						writer.writerow([])
+					else:
+						writer.writerow([self.correct_lines[pair[1]]])
 
 	def find_line_to_assign(self, line_assignments, index, forward=True):
 		iterator = 1 if forward else -1

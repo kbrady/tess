@@ -90,7 +90,7 @@ if __name__ == '__main__':
 	doc = Document('test-data/14-34.8.hocr', 'test-output')
 	correct_bags = get_correct_bags()
 	doc.find_correct(correct_bags, make_matching_dictionary(correct_bags))
-	doc.assign_lines(testing=True)
+	doc.assign_lines(testing=False)
 	doc.calc_char_width()
 	for l in doc.lines:
 		l.initial_mapping(testing=True)

@@ -46,25 +46,15 @@ class Document:
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])
 
-	def find_correct(self, correct_bags=None):
-		bag_of_lines = [str(l) for l in self.lines]
-		best_match = None
-		similarity = 0
-		for correct_filename in correct_bags:
-			matches = 0
-			for ocr_line in bag_of_lines:
-				for correct_line in correct_bags[correct_filename]:
-					if correct_line.find(ocr_line) > -1:
-						matches += 1
-			if matches > similarity:
-				best_match = correct_filename
-				similarity = matches
-		# match to the closest match
-		if best_match is not None:
-			self.assign_correct_bag(correct_filename, correct_bags[correct_filename])
-			return best_match, correct_bags[correct_filename]
-		# if there were no matches raise an exception
-		raise Exception('Could not find file match for '+self.tesseract_file)
+	def find_correct(self, correct_bags, word_to_doc):
+		bag_of_words = [w for l in self.lines for w in (str(l)).split(' ')]
+		document_sets = [word_to_doc[w] for w in bag_of_words]
+		evidence = Counter([doc for doc_set in document_sets for doc in doc_set])
+		if len(evidence) == 0:
+			raise Exception('None of the words found by OCR match a document')
+		best_match, count = max(evidence.items(), key=lambda x: x[1])
+		self.assign_correct_bag(best_match, correct_bags[best_match])
+		return best_match
 
 	def assign_correct_bag(self, correct_filename, correct_lines):
 		self.root.set('filename', correct_filename)
@@ -232,6 +222,7 @@ class Document:
 			# However just rejecting things which are abnormally sized doesn't work because titles will
 			# be rejected.
 			low_index, high_index = self.find_line_to_assign(line_assignments, i)
+			#print self.lines[i].id, low_index, high_index
 			distance = 1.0
 			correct_line_index = None
 			# look through candidates for the most likely match
@@ -246,7 +237,7 @@ class Document:
 			if correct_line_index is None:
 				final_assignment.append((i, None))
 				continue
-			# less than 60% of the line needs to be changed
+			# less than 80% of the line needs to be changed
 			# (this may be a substring so it can actually be quite far from the correct line)
 			# while in general the distance for matches has been less than 10%, I have seen it rise above 20% for 
 			# short lines with lots of numbers

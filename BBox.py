@@ -1,5 +1,3 @@
-
-
 # a class to store, interpret and scale bounding boxes
 class BBox:
 	def __init__(self, info):
@@ -27,3 +25,13 @@ class BBox:
 		# shift top and bottom by down shift
 		self.top += down_shift
 		self.bottom += down_shift
+		# update xml object
+		self.set_et(self.et)
+
+	def set_et(self, et):
+		# save this so updates can automatically happen after scaling
+		self.et = et
+		et.set('left', str(self.left))
+		et.set('right', str(self.right))
+		et.set('top', str(self.top))
+		et.set('bottom', str(self.bottom))

@@ -1,6 +1,4 @@
 from Part import Part
-# to write corrected output to file
-import xml.etree.cElementTree as ET
 # to convert characters to ascii
 import unicodedata
 
@@ -24,12 +22,9 @@ class Word(Part):
 		# save a path to the parent line which will give access to the document
 		# this allows us to use document level statistics such as the width of characters
 		self.line = line
-		# record the id from the hocr document and the ocr text
-		# so that we can audit the resulting xml document for acuracy
-		if et_parent is not None:
-			self.et = ET.SubElement(et_parent, "word", bbox=str(self.bbox), id=self.id, ocr_text=self.text)
-		else:
-			self.et = ET.Element("word", bbox=str(self.bbox), id=self.id, ocr_text=self.text)
+		# make an element tree object to save everything as xml
+		self.set_et(et_parent, 'word')
+		self.et.set('ocr_text', self.text)
 		self.et.text = self.text
 
 	def __repr__(self):
@@ -79,13 +74,7 @@ class Word(Part):
 		# we would rather have blank words than words which are only correct for 1 out of 20 letters
 		# so I am using .8 for the edge cost
 		string_distance = self.levenshteinDistance(match_string, s2_edge_cost=.8, s2_mid_cost=1, s1_cost=1, sub_cost=1)
-		# calculate the width distance
-		scale = 1.0 if self.line.doc.close_to_median_height(self) else float(self.height())/self.line.doc.med_height
-		estimated_width = sum([self.line.doc.chr_widths[c] for c in match_string]) * scale
-		width_distance = abs(self.width() - estimated_width)
-		# We should care much more about string distance than width
-		# I think maybe string distance is all that matters since the initial guess is based on width
-		return string_distance # float(width_distance) * .1 + string_distance
+		return string_distance
 
 	def assign_matching(self, text):
 		self.corrected_text = text
@@ -93,4 +82,3 @@ class Word(Part):
 
 	def scale(self, right_shift, down_shift, multiple):
 		self.bbox.scale(right_shift, down_shift, multiple)
-		self.et.set('bbox', str(self.bbox))

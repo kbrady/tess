@@ -4,8 +4,6 @@ from Part import Part
 from BBox import BBox
 # to save output from some functions
 import csv
-# to write corrected output to file
-import xml.etree.cElementTree as ET
 # to make word frequency vectors and store dimensions
 from collections import Counter, defaultdict
 
@@ -13,14 +11,13 @@ from collections import Counter, defaultdict
 class Line(Part):
 	def __init__(self, tag, doc, et_parent=None):
 		super(self.__class__, self).__init__(tag)
-		self.updated_line = '' 
-		if et_parent is not None:
-			self.et = ET.SubElement(et_parent, "line", bbox=str(self.bbox), id=self.id)
-		else:
-			self.et = ET.Element("line", bbox=str(self.bbox), id=self.id)
+		self.updated_line = ''
+		# make an element tree object to save everything as xml
+		self.set_et(et_parent, 'line')
+		# populate children
 		self.children = [Word(sub_tag, self, self.et) for sub_tag in tag.find_all('span', {'class':'ocrx_word'})]
-		self.word_hist = Counter([str(c) for c in self.children])
-		self.letter_hist = Counter(str(self))
+		# we need a pointer to the document to use character widths
+		# to make the initial mapping
 		self.doc = doc
 	
 	def __repr__(self):
@@ -62,18 +59,11 @@ class Line(Part):
 		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
 		return float(min(final_distances))/len(s1)
 
-	def assign_matching(self, string, testing=False):
+	def assign_matching(self, string):
 		self.updated_line = string
 		# we should keep track of line assignments seperately from word assignments
 		# so we can audit the results
 		self.et.set('updated_line', self.updated_line)
-		# yet again we need the ability to run test runs
-		if not testing:
-			if len(string) > 0:
-				assign(self.children, string.split(' '), complete_coverage=True)
-			else:
-				for word in self.children:
-					word.assign_matching('')
 
 	# estimate word breaks based on character distance
 	def estimate_breaks(self, testing=False):
@@ -373,7 +363,9 @@ class Line(Part):
 				new_pairing[offset_key] = pairing[key]
 		return new_pairing
 
-	def assign_words(self, testing=False):
+	# this function tries sliding the initial mapping over to see if hill climbing works better from
+	# different starting points
+	def find_pairing(self, testing=False):
 		initial_pairing = self.initial_mapping()
 		pairing = self.shove_to_side(initial_pairing, 0)
 		pairing = self.fix_pairing(pairing)
@@ -411,8 +403,18 @@ class Line(Part):
 				writer.writerow(mapping_row)
 		return pairing
 
+	# assign corrected string values to each OCR chunk
+	# (none of the previous functions do this)
+	def assign_words(self, pairing):
+		# get the correct words to assign to children
+		correct_words = self.updated_line.split(' ')
+		for ocr_index in range(len(self.children)):
+			corrected_word_text = ' '.join([correct_words[i] for i in pairing[ocr_index]])
+			self.children[ocr_index].assign_matching(corrected_word_text)
+
+	# There are seperate scale functions for lines and words since lines must also
+	# scale children
 	def scale(self, right_shift, down_shift, multiple):
 		self.bbox.scale(right_shift, down_shift, multiple)
-		self.et.set('bbox', str(self.bbox))
 		for word in self.children:
 			word.scale(right_shift, down_shift, multiple)

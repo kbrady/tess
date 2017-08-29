@@ -11,6 +11,8 @@ import numpy as np
 from bs4 import BeautifulSoup
 # to make word frequency vectors and store dimensions
 from collections import Counter, namedtuple, defaultdict
+# to set the amount to scale by
+import settings
 
 # An object to interpret hocr files
 class Document:
@@ -20,8 +22,11 @@ class Document:
 		if not tesseract_file.endswith('.hocr'):
 			raise Exception(tesseract_file+' is not of type .hocr')
 		# save the locaiton where corrected files will be saved to
+		# if a value is passed for the xml_dir use that
+		# this happens when we are testing and the tesseract_file is not part of a whole session
 		if xml_dir is None:
 			xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		# if we haven't built the xml directory already, make it
 		if not os.path.isdir(xml_dir):
 			os.mkdir(xml_dir)
 		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
@@ -46,24 +51,26 @@ class Document:
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])
 
-	def find_correct(self, correct_bags, word_to_doc):
+	# this function finds the most likely correct document for this OCR document
+	# It does not make the assignment though
+	def find_correct(self, word_to_doc):
 		bag_of_words = [w for l in self.lines for w in (str(l)).split(' ')]
 		document_sets = [word_to_doc[w] for w in bag_of_words]
 		evidence = Counter([doc for doc_set in document_sets for doc in doc_set])
 		if len(evidence) == 0:
 			raise Exception('None of the words found by OCR match a document')
 		best_match, count = max(evidence.items(), key=lambda x: x[1])
-		self.assign_correct_bag(best_match, correct_bags[best_match])
 		return best_match
 
+	# This function assigns the correct document for fixing this document
 	def assign_correct_bag(self, correct_filename, correct_lines):
 		self.root.set('filename', correct_filename)
 		self.correct_lines = correct_lines
 
-	def remove_line(self, line):
-		self.lines.remove(line)
-		self.root.remove(line.et)
-
+	# We will use the width of spaces as the default width for characters
+	# This doesn't seem to be too far off.
+	# A random document had a median space width of 6 pixels
+	# The average character we collected information on was a little wider than 7 pixels
 	def calc_space_width(self):
 		widths = []
 		for l in self.lines:
@@ -204,13 +211,10 @@ class Document:
 		else:
 			return matched_lines, line_assignments
 
+	# this function pairs each OCR line with a corrected string
+	# (blank if nothing good is found)
 	def assign_lines(self, testing=False):
 		matched_lines, line_assignments = self.get_line_matches()
-		right_points = [l.bbox.right for l in matched_lines]
-		left_points = [l.bbox.left for l in matched_lines]
-		Dimensions = namedtuple('Dimensions', ['min', 'max', 'std'])
-		right_dimensions = Dimensions(min(right_points), max(right_points), reasonable_deviation(right_points, left_points))
-		left_dimensions = Dimensions(min(left_points), max(left_points), reasonable_deviation(left_points, right_points))
 		# make a list of the assignments to be carried out which can be looked at seperately by the tester
 		final_assignment = [-1] * len(self.lines)
 		# fill in missing lines (for the moment assume no mistakes with the original matching step)
@@ -264,22 +268,16 @@ class Document:
 				for i in correct_line_assignment_count[correct_line_index]:
 					if i != best_index:
 						final_assignment[i] = None
-		# make a list of lines to delete and delete them after assigning the rest of the lines
-		# (so as not to change the indices)
-		blank_lines = []
+		# After consideration I think it is best not to delete blank lines
+		# Deleteing these lines makes them harder to audit later
 		for index_pair in enumerate(final_assignment):
 			if index_pair[1] is not None:
-				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], testing=True)
+				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]])
 			else:
-				blank_lines.append(self.lines[index_pair[0]])
-		# remove lines which were not matched
-		for l in blank_lines:
-			if True:
-				l.assign_matching('', testing=True)
-			else:
-				self.remove_line(l)
+				self.lines[index_pair[0]].assign_matching('')
+		# if we are testing save the output to a file in the xml directory
 		if testing:
-			with open('line_assignment.csv', 'w') as outputfile:
+			with open(self.xml_dir + os.sep + 'line_assignment.csv', 'w') as outputfile:
 				writer = csv.writer(outputfile, delimiter=',', quotechar='"')
 				for pair in enumerate(final_assignment):
 					writer.writerow([self.lines[pair[0]].id])
@@ -289,6 +287,7 @@ class Document:
 					else:
 						writer.writerow([self.correct_lines[pair[1]]])
 
+	# this function finds the window of assigned lines that this one appears in
 	def find_line_to_assign(self, line_assignments, index, forward=True):
 		iterator = 1 if forward else -1
 		next_found_index = index+iterator
@@ -314,6 +313,16 @@ class Document:
 				print set([str(l) for l in self.lines]) & set(self.correct_lines)
 				raise Exception('No totally correct lines found')
 
+	# function to make all corrections 
+	def fix(self, scale=True):
+		self.assign_lines()
+		self.calc_char_width()
+		for l in self.lines:
+			pairing = l.find_pairing()
+			l.assign_words(pairing)
+		if scale:
+			self.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
+
 	def scale(self, right_shift, down_shift, multiple):
 		for l in self.lines:
 			l.scale(right_shift, down_shift, multiple)
@@ -321,9 +330,3 @@ class Document:
 	def save(self):
 		tree = ET.ElementTree(self.root)
 		tree.write(self.xml_file)
-
-# If the standard deviation is too small, we shouldn't use it
-def reasonable_deviation(list_of_numbers, second_list):
-	min_val = min(list_of_numbers + second_list)
-	max_val = max(list_of_numbers + second_list)
-	return float(max_val - min_val)/4

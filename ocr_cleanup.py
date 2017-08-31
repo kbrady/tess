@@ -83,7 +83,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 	try:
 		cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
 	except Exception as e:
-		print sess.id_string, "has big issues"
+		print sess.id, "has big issues"
 		return
 
 def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc):
@@ -110,7 +110,7 @@ if __name__ == '__main__':
 	print 'time getting document bags', t1 - t0
 	# fix each session and figure out how long it takes
 	all_sessions = get_session_names()
-	with open('cleanup_times.csv', 'w') as outputfile:
+	with open('cleanup_times.csv', 'a') as outputfile:
 		writer = csv.writer(outputfile, delimiter=',', quotechar='"')
 		writer.writerow(['sess_name', 'time'])
 		for sess_name in all_sessions:

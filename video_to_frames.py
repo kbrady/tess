@@ -49,6 +49,27 @@ class Session:
 					filename_part = filename_part[len(self.id):]
 					if filename_part.startswith('_Website') or filename_part.startswith('.txt'):
 						output.append(path + filename)
+		# there are multiple dump files because iMotions is stupid
+		if len(output) == 2:
+			parts_1 = ouput[0].split('Dump')
+			parts_2 = ouput[1].split('Dump')
+			if parts_1[0] == parts_2[0] and parts_1[1][3:] == parts_2[1][3:]:
+				with open(output[0], 'r') as infile:
+					for line in infile:
+						if line.startswith('#Date : '):
+							date_1 = int(line[len('#Date : '):len('#Date : ')+8])
+							break
+				with open(output[1], 'r') as infile:
+					for line in infile:
+						if line.startswith('#Date : '):
+							date_2 = int(line[len('#Date : '):len('#Date : ')+8])
+							break
+				if date_1 > date_2:
+					os.remove(output[1])
+					output = [output[0]]
+				else:
+					os.remove(output[0])
+					output = [output[1]]
 		# exactly one file for each type should be found for each session
 		if len(output) != 1:
 			raise Exception(str(len(output))+' files found for '+self.id+': '+','.join(output))

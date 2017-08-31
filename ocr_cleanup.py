@@ -16,10 +16,10 @@ from Document import Document
 from collections import defaultdict
 
 # get lists of the lines in each correct file
-def get_correct_bags():
+def get_correct_bags(correct_corpus_directory = 'correct_text'):
 	correct_bags = {}
-	for filename in os.listdir('correct_text'):
-		filepath = 'correct_text' + os.sep + filename
+	for filename in os.listdir(correct_corpus_directory):
+		filepath = correct_corpus_directory + os.sep + filename
 		with open(filepath, 'r') as input_file:
 			correct_bags[filename] = [l.strip() for l in input_file]
 	return correct_bags
@@ -53,6 +53,12 @@ def cleanup_session(sess, correct_bags, word_to_doc):
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
 		documents.append(Document(filepath))
+	# get rid of any documents which don't have lines
+	# print out how many of these there are
+	have_lines = [d for d in documents if len(d.lines) > 0]
+	if len(have_lines) < len(documents):
+		print len(documents) - len(have_lines), 'bad documents in', dir_name
+		documents = have_lines
 	# all the documents in a student session map to one correct document
 	# find that document
 	best_match = documents[0].find_correct(word_to_doc)
@@ -77,7 +83,22 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
 
 if __name__ == '__main__':
+	# get the document bags and figure out how long that step takes
+	t0 = time.time()
 	correct_bags = get_correct_bags()
 	word_to_doc = make_matching_dictionary(correct_bags)
-	cleanup_hocr_files('test-data', 'test-output', correct_bags, word_to_doc)
+	t1 = time.time()
+	print 'time getting document bags', t1 - t0
+	# fix each session and figure out how long it takes
+	all_sessions = get_session_names()
+	with open('cleanup_times.csv', 'w') as outputfile:
+		writer = csv.writer(outputfile, delimiter=',', quotechar='"')
+		writer.writerow(['sess_name', 'time'])
+		for sess_name in all_sessions:
+			t0 = time.time()
+			sess = Session(sess_name)
+			cleanup_session(sess, correct_bags, word_to_doc)
+			t1 = time.time()
+			writer.writerow([sess_name, t1 - t0])
+			outputfile.flush()
 	

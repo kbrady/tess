@@ -53,11 +53,32 @@ class Document:
 
 	# this function finds the most likely correct document for this OCR document
 	# It does not make the assignment though
-	def find_correct(self, word_to_doc):
+	def find_correct(self, word_to_doc, testing=False):
 		bag_of_words = [w for l in self.lines for w in (str(l)).split(' ')]
-		document_sets = [word_to_doc[w] for w in bag_of_words]
-		evidence = Counter([doc for doc_set in document_sets for doc in doc_set])
+		evidence = defaultdict(int)
+		# count longer words as more important (these are less likely to be false positives)
+		for w in bag_of_words:
+			if len(w) < 2:
+				continue
+			for doc in word_to_doc[w]:
+				evidence[doc] += np.log(len(w))
+		if testing:
+			document_sets = [word_to_doc[w] for w in bag_of_words]
+			with open('document_counts.csv', 'w') as outputfile:
+				writer = csv.writer(outputfile, delimiter=',', quotechar='"')
+				abbrev_words = []
+				abbrev_doc_sets = []
+				for i in range(len(document_sets)):
+					if len(document_sets[i]) > 0:
+						abbrev_words.append(bag_of_words[i])
+						abbrev_doc_sets.append(document_sets[i])
+				writer.writerow(['Document', 'Count'] + abbrev_words)
+				for filename, count in evidence.items():
+					binary_fun = lambda i: 1 if filename in abbrev_doc_sets[i] else None
+					binary_list = [binary_fun(i) for i in range(len(abbrev_doc_sets))]
+					writer.writerow([filename, count] + binary_list)
 		if len(evidence) == 0:
+			print self.xml_file
 			raise Exception('None of the words found by OCR match a document')
 		best_match, count = max(evidence.items(), key=lambda x: x[1])
 		return best_match

@@ -51,8 +51,8 @@ class Session:
 						output.append(path + filename)
 		# there are multiple dump files because iMotions is stupid
 		if len(output) == 2:
-			parts_1 = ouput[0].split('Dump')
-			parts_2 = ouput[1].split('Dump')
+			parts_1 = output[0].split('Dump')
+			parts_2 = output[1].split('Dump')
 			if parts_1[0] == parts_2[0] and parts_1[1][3:] == parts_2[1][3:]:
 				with open(output[0], 'r') as infile:
 					for line in infile:

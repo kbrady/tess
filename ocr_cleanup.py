@@ -72,7 +72,11 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 		return
 	# all the documents in a student session map to one correct document
 	# find that document
-	best_match = documents[0].find_correct(word_to_doc)
+	try:
+		best_match = documents[0].find_correct(word_to_doc)
+	except Exception as e:
+		print sess.id_string, "starts with a file which doesn't match anything"
+		return
 	# make a function that maps every document index to the best match
 	doc_index_to_filename_fun = lambda x : best_match
 	# cleanup all the documents

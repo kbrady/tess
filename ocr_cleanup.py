@@ -80,7 +80,11 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 	# make a function that maps every document index to the best match
 	doc_index_to_filename_fun = lambda x : best_match
 	# cleanup all the documents
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
+	try:
+		cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
+	except Exception as e:
+		print sess.id_string, "has big issues"
+		return
 
 def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc):
 	# get the documents in this directory

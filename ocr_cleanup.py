@@ -45,13 +45,21 @@ def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun):
 		doc.save()
 
 # do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc):
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
+	# if there are no hocr files to clean, we should move on
+	if not os.path.isdir(dir_name):
+		return
 	# get the documents for this session
 	documents = []
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
+		# don't re-calculate already finished files
+		if not redo:
+			xml_path = sess.dir_name + os.sep + settings.xml_dir + os.sep + filename[:-len('hocr')] + 'xml'
+			if os.path.isfile(xml_path):
+				continue
 		documents.append(Document(filepath))
 	# get rid of any documents which don't have lines
 	# print out how many of these there are
@@ -59,6 +67,9 @@ def cleanup_session(sess, correct_bags, word_to_doc):
 	if len(have_lines) < len(documents):
 		print len(documents) - len(have_lines), 'bad documents in', dir_name
 		documents = have_lines
+	# if there are no documents to correct we are done
+	if len(documents) == 0:
+		return
 	# all the documents in a student session map to one correct document
 	# find that document
 	best_match = documents[0].find_correct(word_to_doc)
@@ -95,6 +106,7 @@ if __name__ == '__main__':
 		writer = csv.writer(outputfile, delimiter=',', quotechar='"')
 		writer.writerow(['sess_name', 'time'])
 		for sess_name in all_sessions:
+			print sess_name
 			t0 = time.time()
 			sess = Session(sess_name)
 			cleanup_session(sess, correct_bags, word_to_doc)

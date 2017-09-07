@@ -68,8 +68,7 @@ def run_tesseract_on_dir(picture_dir, hocr_dir, redo=False):
 		run_tesseract_on_image(image_path, hocr_path)
 
 if __name__ == '__main__':
-	resize_dir('test-data/original-pictures', 'test-data/resized-pictures')
-	run_tesseract_on_dir('test-data/resized-pictures', 'test-data/hocr-files')
+	run_tesseract_on_dir('../ocr-test-data/tricky-data/original-pictures', '../ocr-test-data/tricky-data/unsized-hocr-files')
 	"""
 	# some session ids from the pilot data
 	all_sessions = video_to_frames.get_session_names()

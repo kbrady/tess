@@ -107,7 +107,7 @@ class Document:
 	# find the approximate width of each character.
 	# This can be used to make educated decisions about gaps.
 	# only run this function after running line assignment
-	def calc_char_width(self, testing=True):
+	def calc_char_width(self, testing=False):
 		# initialize by guessing everything is as wide as a space
 		self.chr_widths = defaultdict(lambda:self.space_width)
 		num_words = defaultdict(int)
@@ -131,15 +131,17 @@ class Document:
 				num_words[c] += 1
 		# when testing it is good to see the results as a csv
 		if testing:
-			with open('char_widths.csv', 'w') as output_file:
+			filename = self.xml_file[:-len('.xml')] + '.csv'
+			with open(filename, 'w') as output_file:
 				writer = csv.writer(output_file, delimiter=',', quotechar='"')
 				writer.writerow(['Char', 'Width', 'Num Sightings'])
 				for c in self.chr_widths.keys():
-					writer.writerow([c, self.chr_widths[c], num_words[c]])
+					# divide by two since the image is blown up by two when it is resized
+					writer.writerow([c, float(self.chr_widths[c]), num_words[c]])
 
 	# This is far to simplistic and assumes all letters are about the same.
 	# I need to re-write this to us a back propogation type update method.
-	def get_char_width(self, testing=True):
+	def get_char_width(self, testing=False):
 		# find words which don't need correction
 		perfect_words = []
 		for l in self.lines:

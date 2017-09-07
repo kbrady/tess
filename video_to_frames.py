@@ -363,6 +363,13 @@ def already_made_session(sess_name):
 		return True
 	return False
 
+def time_action(action, message=''):
+	t0 = time.time()
+	output = action()
+	t1 = time.time()
+	print message, t1 - t0
+	return output
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	all_sessions = get_session_names()
@@ -370,14 +377,12 @@ if __name__ == '__main__':
 
 	t0 = time.time()
 	for sess_name in all_sessions:
-		if already_made_session(sess_name):
-			continue
+		#if already_made_session(sess_name):
+		#	continue
 		print sess_name
-		sess = Session(sess_name)
-		sess.break_into_10_second_chunks()
-		sess.find_transitions()
-		sess.calculate_metadata(save_to_file=True)
-		sess.find_digital_reading_transitions()
-	t1 = time.time()
-	print 'time taken', t1 - t0
+		sess = time_action(lambda: Session(sess_name), 'time to build session')
+		time_action(lambda: sess.break_into_10_second_chunks(), 'time to break into 10 sec chunks')
+		time_action(lambda: sess.find_transitions(), 'time to find transitions')
+		time_action(lambda: sess.calculate_metadata(save_to_file=True), 'time to calculate metadata')
+		time_action(lambda: sess.find_digital_reading_transitions(), 'time to find digital reading transitions')
 

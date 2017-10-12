@@ -14,8 +14,19 @@ def replace_unicode(text):
 class Word(Part):
 	def __init__(self, tag, line, et_parent=None):
 		super(self.__class__, self).__init__(tag)
+		if tag.has_attr('title'):
+			self.init_to_fix(tag, line, et_parent)
+		else:
+			self.init_to_read(tag, line)
+
+	def init_to_read(self, tag, line):
+		self.corrected_text = tag.text
+		self.text = tag.ocr_text
+		self.line = line
+
+	def init_to_fix(self, tag, line, et_parent=None):
 		# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
-		self.text = tag.get_text()
+		self.text = tag.text
 		self.text = replace_unicode(self.text)
 		self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
 		self.corrected_text = None
@@ -31,6 +42,12 @@ class Word(Part):
 		if self.corrected_text is not None:
 			return self.corrected_text
 		return ''.join(filter(lambda x:ord(x) < 128, self.text))
+
+	# a function used by pair_with_eyes
+	def get_distance(self, x, y):
+		x_distance = min(abs(self.bbox.left - x), abs(self.bbox.right - x))
+		y_distance = min(abs(self.bbox.top - y), abs(self.bbox.bottom - y))
+		return (x_distance ** 2 + y_distance ** 2) ** .5
 
 	# I am making a word specific implementation of this so we can have fuzzy
 	# matching for substrings (it is more likely that an OCR word contains two words than partial words)

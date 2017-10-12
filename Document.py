@@ -221,8 +221,7 @@ class Document:
 			if len(word_assignments) > 1 and word_assignments.count(word_assignments[0]) == len(word_assignments):
 				line_assignments[i] = word_assignments[0]
 				words_found[i] = wf_list
-		# find the minimum, maximum and std of currect lines
-		# (we will use this to determine if incorrect lines should be included)
+		# figure out which lines were matched
 		matched_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		if len(matched_lines) == 0:
 			print self.tesseract_file
@@ -295,9 +294,10 @@ class Document:
 		# Deleteing these lines makes them harder to audit later
 		for index_pair in enumerate(final_assignment):
 			if index_pair[1] is not None:
-				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]])
+				was_matched_in_first_step = True if self.lines[index_pair[0]] in matched_lines else False
+				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], was_matched_in_first_step)
 			else:
-				self.lines[index_pair[0]].assign_matching('')
+				self.lines[index_pair[0]].assign_matching('', False)
 		# if we are testing save the output to a file in the xml directory
 		if testing:
 			with open(self.xml_dir + os.sep + 'line_assignment.csv', 'w') as outputfile:

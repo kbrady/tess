@@ -5,8 +5,12 @@ import xml.etree.cElementTree as ET
 # A parent object for lines and words which defines some shared functionality
 class Part(object):
 	def __init__(self, tag):
-		info = tag['title'].split('; ')
-		self.bbox = BBox(info[0][info[0].find(' ')+1:])
+		if tag.has_attr('title'):
+			info = tag['title'].split('; ')
+			info = info[0][info[0].find(' ')+1:]
+		else:
+			info = [float(tag[x]) for x in ['left', 'top', 'right', 'bottom']]
+		self.bbox = BBox(info)
 		self.id = tag['id']
 
 	def width(self):

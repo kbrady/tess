@@ -36,12 +36,12 @@ def make_matching_dictionary(correct_bags):
 
 # this function takes a set of documents and the
 # correct documents they matched to and fixes then saves them
-def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun):
+def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, scale=True):
 	for doc_index in range(len(doc_list)):
 		correct_filename = doc_index_to_filename_fun(doc_index)
 		doc = doc_list[doc_index]
 		doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
-		doc.fix()
+		doc.fix(scale=scale)
 		doc.save()
 
 # do the cleanup and save for a whole session
@@ -86,7 +86,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 		print sess.id, "has big issues"
 		return
 
-def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc):
+def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True):
 	# get the documents in this directory
 	documents = []
 	for filename in os.listdir(input_dir_path):
@@ -99,9 +99,20 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 		mapping[i] = documents[i].find_correct(word_to_doc)
 	doc_index_to_filename_fun = lambda x : mapping[x]
 	# cleanup all the documents
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, scale=scale)
 
 if __name__ == '__main__':
+	# get the document bags and figure out how long that step takes
+	t0 = time.time()
+	correct_bags = get_correct_bags()
+	word_to_doc = make_matching_dictionary(correct_bags)
+	t1 = time.time()
+	print 'time getting document bags', t1 - t0
+	# make xml lines
+	input_dir_path = 'parts_for_viz/hocr-files'
+	output_dir_path = 'parts_for_viz/xml-files'
+	cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=False)
+	"""
 	# get the document bags and figure out how long that step takes
 	t0 = time.time()
 	correct_bags = get_correct_bags()
@@ -121,4 +132,5 @@ if __name__ == '__main__':
 			t1 = time.time()
 			writer.writerow([sess_name, t1 - t0])
 			outputfile.flush()
+	"""
 	

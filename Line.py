@@ -11,6 +11,17 @@ from collections import Counter, defaultdict
 class Line(Part):
 	def __init__(self, tag, doc, et_parent=None):
 		super(self.__class__, self).__init__(tag)
+		if tag.has_attr('title'):
+			self.init_to_fix(tag, doc, et_parent)
+		else:
+			self.init_to_read(tag, doc)
+		
+	def init_to_read(self, tag, doc):
+		self.updated_line = tag['updated_line']
+		self.children = [Word(sub_tag, self) for sub_tag in tag.find_all('word')]
+		self.doc = doc
+
+	def init_to_fix(self, tag, doc, et_parent=None):
 		self.updated_line = ''
 		# make an element tree object to save everything as xml
 		self.set_et(et_parent, 'line')
@@ -22,6 +33,15 @@ class Line(Part):
 	
 	def __repr__(self):
 		return ' '.join([str(word) for word in self.children])
+
+	# a function used by pair_with_eyes
+	def get_distances(self, x, y):
+		output = []
+		for word in self.children:
+			distance = word.get_distance(x,y)
+			# if more than one 'word' got assigned to the same box then we need to double count that distance
+			output += [distance] * len(str(word).split(' '))
+		return output
 
 	# I am making a line specific implementation of this so we can have fuzzy
 	# matching for substrings (the whole line is sometimes not visible due to sidebar etc.)
@@ -59,11 +79,12 @@ class Line(Part):
 		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
 		return float(min(final_distances))/len(s1)
 
-	def assign_matching(self, string):
+	def assign_matching(self, string, first_step=False):
 		self.updated_line = string
 		# we should keep track of line assignments seperately from word assignments
 		# so we can audit the results
 		self.et.set('updated_line', self.updated_line)
+		self.et.set('in_first_step', str(first_step))
 
 	# estimate word breaks based on character distance
 	def estimate_breaks(self, testing=False):
@@ -382,6 +403,7 @@ class Line(Part):
 				best_difference = difference
 				best_offset = offset
 				pairing = offset_pairing
+		self.et.set('offset', str(best_offset))
 		# if we are testing, save the mapping for inspection
 		if testing:
 			# get the correct words (we only need these in the test case)

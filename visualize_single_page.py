@@ -54,8 +54,9 @@ def get_mapping_function(frame_document, viz_document_dict):
 	# I should change this so it isn't hardcoded in the future
 	viz_document = viz_document_dict['womens_suffrage_1_B.png.xml'] if '1' in correct_doc else viz_document_dict['womens_suffrage_2_A.png.xml']
 	try:
-		frame_top, viz_top = point_values(frame_document.lines[1], viz_document, top=True)
-		frame_bottom, viz_bottom = point_values(frame_document.lines[-2], viz_document, top=False)
+		non_empty_lines = [l for l in frame_document.lines if len(l.updated_line) > 0]
+		frame_top, viz_top = point_values(non_empty_lines[1], viz_document, top=True)
+		frame_bottom, viz_bottom = point_values(non_empty_lines[-2], viz_document, top=False)
 	except Exception as e:
 		print 'Error raised while matching file '+frame_document.xml_filepath
 		raise e
@@ -67,7 +68,7 @@ def get_mapping_function(frame_document, viz_document_dict):
 def point_values(line_src, dst_document, top):
 	dst_index = None
 	for i in range(len(dst_document.lines)):
-		if str(dst_document.lines[i]) == str(line_src):
+		if dst_document.lines[i].updated_line == line_src.updated_line:
 			dst_index = i
 			break
 	if dst_index is None:
@@ -86,6 +87,7 @@ def calculate_mapped_values_and_save(sess):
 	corpus = pair_screen_with_eyes.Corpus(sess)
 	row_list = pair_screen_with_eyes.get_eye_tracking_rows(sess)
 	document_assignment = corpus.assign_rows(row_list)
+	viz_document_dict = get_viz_documents()
 	with open(sess.dir_name + os.sep + settings.eye_tracking_mapped_csv_file, 'w') as output_file:
 		# open a csv to write into
 		writer = csv.writer(output_file, delimiter=',', quotechar='"')
@@ -101,7 +103,7 @@ def calculate_mapped_values_and_save(sess):
 			if pair[1] != frame_document_index:
 				# this is the xml for the frame
 				frame_document = corpus.documents[pair[1]]
-				mapping_function = visualize_single_page.get_mapping_function(frame_document, viz_document_dict)
+				mapping_function = get_mapping_function(frame_document, viz_document_dict)
 			mapped_x, mapped_y = mapping_function(int(row.GazeX), int(row.GazeY))
 			writer.writerow([mapped_x, mapped_y, row.Timestamp, row.MediaTime])
 
@@ -181,14 +183,78 @@ def plot_heatmap(bins, dst_img_path, output_path, parts=4):
 	ax.set_title('Number of Fixations')
 	plt.savefig(output_path, dpi=800)
 
+# visualize scrolling
+def get_scroll(sess):
+	# get the corpus
+	corpus = pair_screen_with_eyes.Corpus(sess)
+	# get the correct document for this corpus
+	viz_document_dict = get_viz_documents()
+	data = []
+	# calculate the correct file for visualizing
+	correct_doc = corpus.documents[0].correct_filepath
+	# retrieve the time and top of page values for each document
+	for doc in corpus.documents:
+		t = doc.time
+		mapping_function = get_mapping_function(doc, viz_document_dict)
+		_, y_top = mapping_function(500, settings.digital_reading_y_range[0])
+		_, y_bottom = mapping_function(500, settings.digital_reading_y_range[1])
+		data.append((t,y_top, y_bottom))
+	return data, correct_doc
+
+def plot_scroll(sess):
+	# get the scrolling data
+	data, correct_doc = get_scroll(sess)
+	# expand the data to cover the full time period for each frame
+	data += [(data[i][0]-.05, data[i-1][1], data[i-1][2]) for i in range(1,len(data))]
+	data.sort()
+	# load an image of the file
+	dst_img_path = 'parts_for_viz/resized-images/womens_suffrage_'
+	dst_img_path += '1_B.png' if correct_doc.find('1') != -1 else '2_A.png'
+	dst_img = Image.open(dst_img_path)
+	width, height = dst_img.size
+	# visualize image
+	plt.imshow(dst_img)
+	# plot data on top
+	x_vals, y_top_vals, y_bottom_vals = zip(*data)
+	x_vals_scaled = [(x-min(x_vals))/(max(x_vals)-min(x_vals))*width for x in x_vals]
+	plt.plot(x_vals_scaled, y_top_vals)
+	plt.plot(x_vals_scaled, y_bottom_vals)
+	plt.xlabel('Time')
+	plt.ylabel('Top and Bottom of Screen')
+	# fix x ticks
+	x_tick_vals = plt.xticks()[0]
+	x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals))+min(x_vals) for x in x_tick_vals]
+	num_to_str = lambda num: str(int(num)) if num >= 10 else '0'+str(int(num))
+	to_time_str = lambda t: num_to_str(int(t)/60) + ':' + num_to_str(t-((int(t)/60)*60))
+	plt.xticks(x_tick_vals, [to_time_str(xt) for xt in x_tick_vals_unscaled])
+	# get rid of y ticks
+	plt.yticks([], [])
+	plt.savefig(sess.dir_name + os.sep + 'scrolling.png', dpi=800)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	session_even_names = ['fourth-participant-second-version', 'second_student_participant', 'sixth_participant'] # 'eighth_participant'
+	session_even_names = ['second_student_participant', 'sixth_participant'] # 'eighth_participant', 'fourth-participant-second-version', 
 	session_odd_names = ['fifth_participant', 'first_student_participant_second_take','seventh_participant', 'third_student_participant']
-	
-	heatmap = make_heatmap(session_odd_names, 'parts_for_viz/resized-images/womens_suffrage_2_A.png')
-	plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_2_A.png', 'womens_suffrage_2_A_heatmap.png', parts=5)
 
-	heatmap = make_heatmap(session_even_names, 'parts_for_viz/resized-images/womens_suffrage_1_B.png')
-	plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_1_B.png', 'womens_suffrage_1_B_heatmap.png', parts=5)
+	for sess_name in ['Amanda']: #session_even_names + session_odd_names:
+		print sess_name
+		sess = Session(sess_name)
+		if not os.path.isdir(sess.dir_name + os.sep + 'hocr-files'):
+			print 'no hocr'
+			continue
+		if not os.path.isdir(sess.dir_name + os.sep + 'xml-files'):
+			print 'no xml'
+			continue
+		hocr_files = len(os.listdir(sess.dir_name + os.sep + 'hocr-files'))
+		xml_files = len(os.listdir(sess.dir_name + os.sep + 'xml-files'))
+		if hocr_files == xml_files:
+			plot_scroll(sess)
+		else:
+			print hocr_files, xml_files
+	
+	# heatmap = make_heatmap(session_odd_names, 'parts_for_viz/resized-images/womens_suffrage_2_A.png')
+	# plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_2_A.png', 'womens_suffrage_2_A_heatmap.png', parts=5)
+
+	# heatmap = make_heatmap(session_even_names, 'parts_for_viz/resized-images/womens_suffrage_1_B.png')
+	# plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_1_B.png', 'womens_suffrage_1_B_heatmap.png', parts=5)
 

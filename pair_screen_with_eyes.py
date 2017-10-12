@@ -12,51 +12,8 @@ from collections import namedtuple
 import time
 # to read xml files
 from bs4 import BeautifulSoup
-
-# a class to store and interpret boxes
-class BBox:
-	def __init__(self, info):
-		if type(info) == str or type(info) == unicode:
-			info = [float(x) for x in info.split(' ')]
-		self.right, self.top, self.left, self.bottom = info
-
-# A parent object for lines and words which defines some shared functionality
-class Part(object):
-	def __init__(self, tag):
-		self.bbox = BBox(tag['bbox'])
-
-# An object to interpret words in hocr files
-class Word(Part):
-	def __init__(self, tag):
-		super(self.__class__, self).__init__(tag)
-		# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
-		self.text = tag.get_text()
-
-	def __repr__(self):
-		return self.text
-
-	def get_distance(self, x, y):
-		x_distance = min(abs(self.bbox.left - x), abs(self.bbox.right - x))
-		y_distance = min(abs(self.bbox.top - y), abs(self.bbox.bottom - y))
-		return (x_distance ** 2 + y_distance ** 2) ** .5
-
-class Line(Part):
-	def __init__(self, tag):
-		super(self.__class__, self).__init__(tag)
-		self.children = [Word(sub_tag) for sub_tag in tag.find_all('word')]
-
-	def __repr__(self):
-		# We need to make sure to exclude empty words.
-		# The system has no method for filtering them and they are likely to occure with tessaract
-		return ' '.join([str(word) for word in self.children if len(str(word)) > 0])
-
-	def get_distances(self, x, y):
-		output = []
-		for word in self.children:
-			distance = word.get_distance(x,y)
-			# if more than one 'word' got assigned to the same box then we need to double count that distance
-			output += [distance] * len(str(word).split(' '))
-		return output
+# to get up to date with improved parts
+from Line import Line
 
 class Document:
 	def __init__(self, xml_filepath, dr_time):
@@ -69,7 +26,7 @@ class Document:
 			soup = BeautifulSoup(data, "html.parser")
 			tag = soup.find('root')
 			self.correct_filepath = 'correct_text' + os.sep + tag['filename']
-			self.lines = [Line(sub_tag) for sub_tag in tag.find_all('line')]
+			self.lines = [Line(sub_tag, self) for sub_tag in tag.find_all('line')]
 
 	def get_word_distance(self, row):
 		list_of_line_strings = [str(l) for l in self.lines]

@@ -262,7 +262,7 @@ class Session:
 def time_to_filename(current_time):
 	# calculate the minutes and seconds of the time and use these values to create the filename
 	minutes = int(current_time/60)
-	seconds = current_time - (minutes * 60)
+	seconds = float(current_time - (minutes * 60))
 	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
 	return filename
 

@@ -36,16 +36,17 @@ def make_matching_dictionary(correct_bags):
 
 # this function takes a set of documents and the
 # correct documents they matched to and fixes then saves them
-def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, scale=True):
+def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, scale=True, stop_at_lines=False, alt_dir_name=None):
 	for doc_index in range(len(doc_list)):
 		correct_filename = doc_index_to_filename_fun(doc_index)
 		doc = doc_list[doc_index]
 		doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
-		doc.fix(scale=scale)
-		doc.save()
+		# we want to have the option to just find matching lines and save to other filenames
+		doc.fix(scale=scale, stop_at_lines=stop_at_lines)
+		doc.save(alt_dir_name=alt_dir_name)
 
 # do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
 	# if there are no hocr files to clean, we should move on
@@ -81,12 +82,12 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False):
 	doc_index_to_filename_fun = lambda x : best_match
 	# cleanup all the documents
 	try:
-		cleanup_docs(documents, correct_bags, doc_index_to_filename_fun)
+		cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 	except Exception as e:
 		print sess.id, "has big issues"
 		return
 
-def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True):
+def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True, stop_at_lines=False, alt_dir_name=None):
 	# get the documents in this directory
 	documents = []
 	for filename in os.listdir(input_dir_path):
@@ -99,7 +100,7 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 		mapping[i] = documents[i].find_correct(word_to_doc)
 	doc_index_to_filename_fun = lambda x : mapping[x]
 	# cleanup all the documents
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, scale=scale)
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, scale=scale, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 
 if __name__ == '__main__':
 	# get the document bags and figure out how long that step takes

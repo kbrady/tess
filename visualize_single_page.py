@@ -202,6 +202,8 @@ def get_scroll(sess):
 	return data, correct_doc
 
 def plot_scroll(sess):
+	# make sure there is nothing still in the figure
+	plt.cla()
 	# get the scrolling data
 	data, correct_doc = get_scroll(sess)
 	# expand the data to cover the full time period for each frame
@@ -236,7 +238,7 @@ if __name__ == '__main__':
 	session_even_names = ['second_student_participant', 'sixth_participant'] # 'eighth_participant', 'fourth-participant-second-version', 
 	session_odd_names = ['fifth_participant', 'first_student_participant_second_take','seventh_participant', 'third_student_participant']
 
-	for sess_name in ['Amanda']: #session_even_names + session_odd_names:
+	for sess_name in session_even_names + session_odd_names:
 		print sess_name
 		sess = Session(sess_name)
 		if not os.path.isdir(sess.dir_name + os.sep + 'hocr-files'):

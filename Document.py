@@ -337,12 +337,13 @@ class Document:
 				raise Exception('No totally correct lines found')
 
 	# function to make all corrections 
-	def fix(self, scale=True):
+	def fix(self, scale=True, stop_at_lines=False):
 		self.assign_lines()
-		self.calc_char_width()
-		for l in self.lines:
-			pairing = l.find_pairing()
-			l.assign_words(pairing)
+		if not stop_at_lines:
+			self.calc_char_width()
+			for l in self.lines:
+				pairing = l.find_pairing()
+				l.assign_words(pairing)
 		if scale:
 			self.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
 
@@ -350,6 +351,14 @@ class Document:
 		for l in self.lines:
 			l.scale(right_shift, down_shift, multiple)
 
-	def save(self):
+	def save(self, alt_dir_name=None):
+		if alt_dir_name is not None:
+			sess_dir = os.sep.join(self.xml_file.split(os.sep)[:-2])
+			dir_name = sess_dir + os.sep + alt_dir_name
+			if not os.path.isdir(dir_name):
+				os.mkdir(dir_name)
+			filepath = dir_name + os.sep + self.xml_file.split(os.sep)[-1]
+		else:
+			filepath = self.xml_file
 		tree = ET.ElementTree(self.root)
-		tree.write(self.xml_file)
+		tree.write(filepath)

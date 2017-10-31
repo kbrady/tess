@@ -16,6 +16,7 @@ import sys
 # to run ffmpeg in the background
 import subprocess
 
+# A class to keep track of a sessions files
 class Session:
 	def __init__(self, id_string):
 		# this is the string by which this participant will be recognized by from now on
@@ -36,6 +37,7 @@ class Session:
 				if len(json_str) > 5:
 					self.metadata = json.loads(json_str)
 	
+	# calculate the names of any files for this session
 	def calculate_filenames(self, dir_name):
 		output = []
 		# look through the files in both conditions, this makes it easier than remember all the condition pairings
@@ -82,7 +84,8 @@ class Session:
 		output += str(self.sensor_data)
 		return output
 
-	# switch only_if_frame_does_not_exist back to True
+	# A function to pull out the frame for a given time in the video
+	# switch only_if_frame_does_not_exist on if the program might quit and need to start up again
 	def screen_time_to_picture(self, current_time, only_if_frame_does_not_exist=True):
 		# It is good to have this turned on if you think you will run this on the same time stamp without meaning to
 		if only_if_frame_does_not_exist:
@@ -96,27 +99,17 @@ class Session:
 		dir_name = self.dir_name + os.sep + 'frame-images'
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
-		# only replace spaces in dir_name with backslash spaces after running os commands on the original name
-		# (such as building the directory in the first place)
-		#dir_name = dir_name.replace(' ', '\ ')
-		#screen_recording_filename = self.screen_recording_filename.replace(' ', '\ ')
+		# 
 		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
-		# nohup stops the process from ending when the python script does
-		# [https://stackoverflow.com/questions/1605520/how-to-launch-and-run-external-script-in-background#1605539]
 		command = ['ffmpeg', '-ss']
 		# calculate the minutes and seconds of the time
 		minutes = int(current_time/60)
 		seconds = current_time - (minutes * 60)
 		command.append('00:'+num_to_str(minutes)+':'+num_to_str(seconds))
 		command += ['-i', self.screen_recording_filename, '-frames:v', '1', dir_name+os.sep+filename]
-		#escape_fun = lambda part : part.replace('(','\(').replace(')','\)').replace(' ', '\ ')
-		#shell_command = ' '.join([escape_fun(x) for x in command]) + ' &'
-		#command = command.replace('(','\(')
-		#command = command.replace(')','\)')
 		# Apparently Popen stops the python script after running
 		subprocess.call(command)
-		#sys.exit()
 
 	# a function to save time by not running ffmpeg more than necessary
 	def picture_for_frame_exists(self, current_time):
@@ -127,6 +120,8 @@ class Session:
 		filename = time_to_filename(current_time)
 		return os.path.exists(dir_name + os.sep + filename)
 	
+	# pull out a frame at 10 second intervals (assumed to be small enough to catch changes)
+	# this appears to be too short for pop-ups
 	def break_into_10_second_chunks(self):
 		duration = imageio.get_reader(self.screen_recording_filename, 'ffmpeg').get_meta_data()['duration']
 		current_time = 0
@@ -135,6 +130,8 @@ class Session:
 			self.screen_time_to_picture(current_time)
 			current_time += 10
 
+	# figure out which part of the stimuli the current frame belongs to
+	# this uses a lot of hard coded methods of assessing whether the part is the same
 	def assess_stimuli_timestamps(self, file_list=None):
 		assignments = {}
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
@@ -147,33 +144,39 @@ class Session:
 
 	# the reading is the same if the pixels for the first line are the same and the sidebar is in the same position
 	def find_digital_reading_transitions(self):
+		# calculate the metadata globally
+		# this method is only for the digital reading so the rest of the session
+		# should already be calculated
 		if len(self.metadata) == 0:
 			self.metadata = self.calculate_metadata(save_to_file=True)
+		# get the time spans when digital reading occured
 		digital_reading_times = [x for x in self.metadata if x['part'] == 'digital reading']
+		# the directory where frames are stored
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
-		picture_value = lambda filename: get_part_of_picture(dir_name + os.sep + filename, x_range=[0, 1400], y_range=[600,700])
+		picture_value = lambda filename: get_part_of_picture(dir_name + os.sep + filename, x_range=settings.digital_reading_x_range, y_range=settings.digital_reading_y_range)
 		for reading_interval in digital_reading_times:
 			filenames = self.get_image_filenames_in_timespan(reading_interval['start_time'], reading_interval['end_time'])
 			for i in range(len(filenames)-1):
+				# do a binary search between frames for the point of transition
+				# the search will halt imediately if there is no difference
 				start_value = picture_value(filenames[i])
 				end_value = picture_value(filenames[i+1])
-				if not (start_value == end_value).all():
-					start_time = filename_to_time(filenames[i])
-					end_time = filename_to_time(filenames[i+1])
-					if end_time - start_time > .1:
-						self.binary_frame_search(start_time, end_time, start_value, end_value, value_fun=picture_value)
+				start_time = filename_to_time(filenames[i])
+				end_time = filename_to_time(filenames[i+1])
+				self.binary_frame_search(start_time, end_time, start_value, end_value, value_fun=picture_value)
 			# now that we have made sure we have all the necessary files, look for the transitions
+			# recalculating this takes time but debugging the faster version will take time
 			filenames = self.get_image_filenames_in_timespan(reading_interval['start_time'], reading_interval['end_time'])
 			transition_list = [filename_to_time(filenames[0])]
 			for i in range(len(filenames)-1):
+				# figure out if two fames are the same
 				start_value = picture_value(filenames[i])
 				end_value = picture_value(filenames[i+1])
-				if not (start_value == end_value).all():
+				if images_different(start_value, end_value):
 					transition_list.append(filename_to_time(filenames[i+1]))
 			reading_interval['transitions'] = transition_list
 		with open(self.dir_name + os.sep + settings.metadata_file, 'w') as metadata_output:
 			metadata_output.write(json.dumps(self.metadata, ensure_ascii=False))
-
 
 	# get all frame images which have been taken in a given time span
 	def get_image_filenames_in_timespan(self, start_time, end_time):
@@ -185,6 +188,8 @@ class Session:
 		output.sort(key = lambda x: filename_to_time(x))
 		return output
 
+	# this funciton calculates the metadata for this section
+	# it can save the metadata to the metadata.json file so it can be accessed later
 	def calculate_metadata(self, save_to_file=False):
 		metadata = []
 		assignments = self.assess_stimuli_timestamps()
@@ -221,6 +226,7 @@ class Session:
 		# return the calculated metadata
 		return metadata
 
+	# this function finds the transitions between parts of the stimuli (like digital reading and forms)
 	def find_transitions(self):
 		assignments = self.assess_stimuli_timestamps()
 		times = assignments.keys()
@@ -235,7 +241,11 @@ class Session:
 					continue
 				self.binary_frame_search(times[i][0], times[i+1][0], assignments[times[i][1]], assignments[times[i+1][1]], value_fun=value_fun)
 
+	# this is a function to find points when the video changed using a binary search
+	# This is used both to differentiate between parts of the stimuli (like digital reading and forms)
+	# and between frames in the digital reading section
 	def binary_frame_search(self, start_time, end_time, start_value, end_value, value_fun):
+		# check if we should stop due to time
 		if start_time > end_time or end_time - start_time <= .15:
 			return
 		# in some cases we compare whether the catagories of images
@@ -245,7 +255,8 @@ class Session:
 		if type(start_value) == str:
 			key = lambda x, y: x == y
 		else:
-			key = lambda x, y: (x == y).all()
+			key = lambda x, y: not images_different(x, y)
+		# check if we should stop due to the values being equal
 		if key(start_value, end_value):
 			return
 		middle_time = float(int((float(start_time + end_time)/2)*10))/10
@@ -259,6 +270,8 @@ class Session:
 		self.binary_frame_search(start_time, middle_time, start_value, middle_value, value_fun=value_fun)
 		self.binary_frame_search(middle_time, end_time, middle_value, end_value, value_fun=value_fun)
 
+# this function is used more than any other by other scripts
+# from a timestamp calculate the filename
 def time_to_filename(current_time):
 	# calculate the minutes and seconds of the time and use these values to create the filename
 	minutes = int(current_time/60)
@@ -266,6 +279,7 @@ def time_to_filename(current_time):
 	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
 	return filename
 
+# from a filename calculate the timestamp
 def filename_to_time(filename):
 	parts = filename.split('.')
 	minutes, seconds = [int(x) for x in parts[0].split('-')]
@@ -274,6 +288,57 @@ def filename_to_time(filename):
 	else:
 		miliseconds = 0
 	return minutes * 60 + seconds + miliseconds
+
+# calculate if two images are the same in a fast manner
+# Ajay and I are going to work on an even better method which will 
+# figure out forgrounds (pop-ups) and scrolling
+def images_different(t1_img, t2_img):
+	# helper function to load images
+	def flatten_img(img):
+		return img[:,:,0]/3 + img[:,:,1]/3 + img[:,:,2]/3
+	# helpur function to get the difference between images
+	def compare_images(t1_img, t2_img):
+		diff = abs(flatten_img(t1_img) - flatten_img(t2_img))
+		return diff
+	# helper functon to do a recursive search and find box
+	# we only need to find one box to consider images different, so
+	# don't worry about figuring out where they are
+	def find_box(mat, depth=0):
+		# important constants based on search of best values for
+		# splitting the images found for the seventh undergrad
+		frac_for_diff = .9
+		cutoff = 1
+		# get the dimensions of the matrix part
+		height, width = mat.shape
+		# figure out if the stoping consitions are met
+		num_above_cutoff = (mat > cutoff).sum()
+		if float(num_above_cutoff)/mat.size > frac_for_diff:
+			return True
+		# if a box has less than 100 * frac_for_diff pixels which are different
+		# it couldn't be mostly different anyway
+		if num_above_cutoff.sum() < 100 * frac_for_diff:
+			return False
+		# if the size falls bellow double the height of text, we don't consider smaller windows
+		if height < 20 and width < 20:
+			return False
+		# split mat in half
+		mat_l = mat[:, :width/2]
+		mat_r = mat[:, width/2:]
+		# get results
+		# transpose the matrix so next time we cut top to bottom
+		left_diff = find_box(mat_l.T, depth + 1)
+		# if we found a box on the left, don't bother looking on the right
+		if left_diff:
+			return left_diff
+		right_diff = find_box(mat_r.T, depth + 1)
+		return right_diff
+
+	gray_diff_img = compare_images(t1_img, t2_img)
+	# we only look at the part with text, so crop image to that part
+	x_l, x_r, y_t, y_b = settings.digital_reading_x_range + settings.digital_reading_y_range
+	gray_diff_img = gray_diff_img[y_t:y_b, x_l:x_r]
+	
+	return find_box(gray_diff_img)
 
 def figure_out_part_of_stimuli_frame_is_in(image_path):
 	pic = np.array(misc.imread(image_path))
@@ -375,7 +440,6 @@ if __name__ == '__main__':
 	all_sessions = get_session_names()
 	print all_sessions
 
-	t0 = time.time()
 	for sess_name in all_sessions:
 		#if already_made_session(sess_name):
 		#	continue

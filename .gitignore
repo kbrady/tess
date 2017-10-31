@@ -29,3 +29,8 @@ nohup.out
 
 # Similarly there should be nothing from the virtual environment folder
 venv_folder/*
+
+# A lot of .txt files might get generated just to test stuff
+# We don't want them in version control
+*.txt
+!requirements.txt

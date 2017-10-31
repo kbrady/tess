@@ -29,4 +29,4 @@ if __name__ == '__main__':
 		print t2 - t1, 'seconds to run initial ocr'
 		ocr_cleanup.cleanup_session(sess, correct_bags, word_to_doc, stop_at_lines=True, alt_dir_name='line_matched')
 		t3 = time.time()
-		print t2 - t1, 'seconds to clean ocr'
+		print t3 - t2, 'seconds to clean ocr'

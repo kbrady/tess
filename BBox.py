@@ -11,7 +11,9 @@ class BBox:
 			raise e
 
 	def __str__(self):
-		return ' '.join([str(x) for x in [self.right, self.top, self.left, self.bottom]])
+		def get_pair(attr_name):
+			return attr_name+': '+str(getattr(self, attr_name))
+		return ' '.join([get_pair(x) for x in ['right', 'top', 'left', 'bottom']])
 
 	def scale(self, right_shift, down_shift, multiple):
 		# stretch by multiple

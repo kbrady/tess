@@ -48,18 +48,27 @@ class Document:
 
 # the set of documents for each frame set
 class Corpus:
-	def __init__(self, sess):
+	def __init__(self, sess, xml_dir_extention=None):
+		# set the xml_dir_extention correctly
+		xml_dir_extention = xml_dir_extention if xml_dir_extention is not None else settings.xml_dir
 		# get the filepath for each document
 		def time_to_filepath(dr_time):
-			xml_dir = sess.dir_name + os.sep + settings.xml_dir
+			xml_dir = sess.dir_name + os.sep + xml_dir_extention
 			minutes = int(dr_time/60)
 			seconds = dr_time - (minutes * 60)
 			filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.xml'
 			return xml_dir + os.sep + filename
 		digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
-		# for now let us assume that there is only one digital reading
-		digital_reading_transitions = digital_reading_times[0]['transitions']
-		self.documents = [Document(time_to_filepath(dr_time), dr_time) for dr_time in digital_reading_transitions]
+		# we will use the digital reading sequence with the most frame transitions
+		# scrolling a lot and highlighting should happen during actual reading though we
+		# might want to consider end_time - start_time instead
+		digital_reading_times.sort(key=lambda x: x['end_time'] - x['start_time'], reverse=True)
+		if len(digital_reading_times) > 0:
+			# for now let us assume that there is only one digital reading
+			digital_reading_transitions = digital_reading_times[0]['transitions']
+			self.documents = [Document(time_to_filepath(dr_time), dr_time) for dr_time in digital_reading_transitions]
+		else:
+			self.documents = []
 		self.dir_name = sess.dir_name
 
 	# best to assign rows all together since we can capitalize off the fact that the rows and documents are both

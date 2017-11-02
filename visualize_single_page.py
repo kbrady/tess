@@ -49,6 +49,8 @@ def get_viz_documents():
 		viz_documents[filename] = pair_screen_with_eyes.Document(xml_path, None)
 	return viz_documents
 
+# this function produces a function which maps a point in a frame image to
+# a point on the image of the correct document which we made with piazza
 def get_mapping_function(frame_document, viz_document_dict):
 	correct_doc = frame_document.correct_filepath
 	# I should change this so it isn't hardcoded in the future
@@ -56,10 +58,20 @@ def get_mapping_function(frame_document, viz_document_dict):
 	try:
 		non_empty_lines = [l for l in frame_document.lines if len(l.updated_line) > 0]
 		frame_top, viz_top = point_values(non_empty_lines[1], viz_document, top=True)
-		frame_bottom, viz_bottom = point_values(non_empty_lines[-2], viz_document, top=False)
+		bottom_index = len(non_empty_lines)-2
+		frame_bottom, viz_bottom = point_values(non_empty_lines[bottom_index], viz_document, top=False)
+		while bottom_index > 1 and frame_bottom[0] <= frame_top[0]:
+			bottom_index -= 1
+			frame_bottom, viz_bottom = point_values(non_empty_lines[bottom_index], viz_document, top=False)
 	except Exception as e:
 		print 'Error raised while matching file '+frame_document.xml_filepath
 		raise e
+	if frame_bottom[0] == frame_top[0]:
+		print frame_document.xml_filepath
+		print bottom_index
+		print non_empty_lines[1].bbox
+		print non_empty_lines[-2].bbox
+		raise Exception('frame_bottom = '+str(frame_bottom)+' and frame_top = '+str(frame_top))
 	x_fun = lambda x : (x-frame_top[0])*float(viz_bottom[0]-viz_top[0])/(frame_bottom[0]-frame_top[0]) + viz_top[0]
 	y_fun = lambda y : (y-frame_top[1])*float(viz_bottom[1]-viz_top[1])/(frame_bottom[1]-frame_top[1]) + viz_top[1]
 	return lambda x,y : (x_fun(x), y_fun(y))
@@ -77,6 +89,8 @@ def point_values(line_src, dst_document, top):
 	x_dst, y_dst = get_x_and_y(dst_document.lines[dst_index], top)
 	return (x_src, y_src), (x_dst, y_dst)
 
+# this is based on the line level not the word level which 
+# might be problematic if a pop-up is covering half of the line
 def get_x_and_y(line_val, top):
 	x = line_val.bbox.left if top else line_val.bbox.right
 	y = line_val.bbox.top if top else line_val.bbox.bottom
@@ -184,9 +198,11 @@ def plot_heatmap(bins, dst_img_path, output_path, parts=4):
 	plt.savefig(output_path, dpi=800)
 
 # visualize scrolling
-def get_scroll(sess):
+def get_scroll(sess, xml_dir_extention=None):
 	# get the corpus
-	corpus = pair_screen_with_eyes.Corpus(sess)
+	corpus = pair_screen_with_eyes.Corpus(sess, xml_dir_extention=xml_dir_extention)
+	if len(corpus.documents) == 0:
+		return [], None
 	# get the correct document for this corpus
 	viz_document_dict = get_viz_documents()
 	data = []
@@ -201,11 +217,13 @@ def get_scroll(sess):
 		data.append((t,y_top, y_bottom))
 	return data, correct_doc
 
-def plot_scroll(sess):
+def plot_scroll(sess, xml_dir_extention=None):
 	# make sure there is nothing still in the figure
 	plt.cla()
 	# get the scrolling data
-	data, correct_doc = get_scroll(sess)
+	data, correct_doc = get_scroll(sess, xml_dir_extention=xml_dir_extention)
+	if len(data) == 0:
+		return
 	# expand the data to cover the full time period for each frame
 	data += [(data[i][0]-.05, data[i-1][1], data[i-1][2]) for i in range(1,len(data))]
 	data.sort()
@@ -219,8 +237,8 @@ def plot_scroll(sess):
 	# plot data on top
 	x_vals, y_top_vals, y_bottom_vals = zip(*data)
 	x_vals_scaled = [(x-min(x_vals))/(max(x_vals)-min(x_vals))*width for x in x_vals]
-	plt.plot(x_vals_scaled, y_top_vals)
-	plt.plot(x_vals_scaled, y_bottom_vals)
+	plt.plot(x_vals_scaled, y_top_vals, 'b')
+	plt.plot(x_vals_scaled, y_bottom_vals, 'b')
 	plt.xlabel('Time')
 	plt.ylabel('Top and Bottom of Screen')
 	# fix x ticks

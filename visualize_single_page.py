@@ -212,8 +212,8 @@ def get_scroll(sess, xml_dir_extention=None):
 	for doc in corpus.documents:
 		t = doc.time
 		mapping_function = get_mapping_function(doc, viz_document_dict)
-		_, y_top = mapping_function(500, settings.digital_reading_y_range[0])
-		_, y_bottom = mapping_function(500, settings.digital_reading_y_range[1])
+		_, y_top = mapping_function(500, settings.y_range['digital reading'][0])
+		_, y_bottom = mapping_function(500, settings.y_range['digital reading'][1])
 		data.append((t,y_top, y_bottom))
 	return data, correct_doc
 

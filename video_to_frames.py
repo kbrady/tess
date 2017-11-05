@@ -142,19 +142,25 @@ class Session:
 			assignments[image_file] = part_of_stimuli
 		return assignments
 
-	# the reading is the same if the pixels for the first line are the same and the sidebar is in the same position
+	# find reading transitions during the post test
+	def find_form_reading_transitions(self):
+		self.find_reading_transitions(part = 'form')
+
 	def find_digital_reading_transitions(self):
+		self.find_reading_transitions(part = 'digital reading')
+
+	def find_reading_transitions(self, part='digital reading'):
 		# calculate the metadata globally
 		# this method is only for the digital reading so the rest of the session
 		# should already be calculated
 		if len(self.metadata) == 0:
 			self.metadata = self.calculate_metadata(save_to_file=True)
 		# get the time spans when digital reading occured
-		digital_reading_times = [x for x in self.metadata if x['part'] == 'digital reading']
+		reading_times = [x for x in self.metadata if x['part'] == part]
 		# the directory where frames are stored
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
-		picture_value = lambda filename: get_part_of_picture(dir_name + os.sep + filename, x_range=settings.digital_reading_x_range, y_range=settings.digital_reading_y_range)
-		for reading_interval in digital_reading_times:
+		picture_value = lambda filename: get_part_of_picture(dir_name + os.sep + filename, x_range=settings.x_range[part], y_range=settings.y_range[part])
+		for reading_interval in reading_times:
 			filenames = self.get_image_filenames_in_timespan(reading_interval['start_time'], reading_interval['end_time'])
 			for i in range(len(filenames)-1):
 				# do a binary search between frames for the point of transition
@@ -272,11 +278,12 @@ class Session:
 
 # this function is used more than any other by other scripts
 # from a timestamp calculate the filename
-def time_to_filename(current_time):
+def time_to_filename(current_time, extension='jpg'):
+	extension = extension.strip('.')
 	# calculate the minutes and seconds of the time and use these values to create the filename
 	minutes = int(current_time/60)
 	seconds = float(current_time - (minutes * 60))
-	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.jpg'
+	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.' + extension
 	return filename
 
 # from a filename calculate the timestamp
@@ -334,9 +341,6 @@ def images_different(t1_img, t2_img):
 		return right_diff
 
 	gray_diff_img = compare_images(t1_img, t2_img)
-	# we only look at the part with text, so crop image to that part
-	x_l, x_r, y_t, y_b = settings.digital_reading_x_range + settings.digital_reading_y_range
-	gray_diff_img = gray_diff_img[y_t:y_b, x_l:x_r]
 	
 	return find_box(gray_diff_img)
 

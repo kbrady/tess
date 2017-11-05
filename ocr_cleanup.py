@@ -3,7 +3,7 @@ import os
 # to look in the right places
 import settings
 # to get the session info
-from video_to_frames import Session, get_session_names
+from video_to_frames import Session, get_session_names, time_to_filename
 # to measure how long each session is taking
 import time
 # to calculate the standard deviation of dimensions
@@ -16,7 +16,7 @@ from Document import Document
 from collections import defaultdict
 
 # get lists of the lines in each correct file
-def get_correct_bags(correct_corpus_directory = 'correct_text'):
+def get_correct_bags(correct_corpus_directory = 'correct_text/digital_reading'):
 	correct_bags = {}
 	for filename in os.listdir(correct_corpus_directory):
 		filepath = correct_corpus_directory + os.sep + filename
@@ -36,25 +36,29 @@ def make_matching_dictionary(correct_bags):
 
 # this function takes a set of documents and the
 # correct documents they matched to and fixes then saves them
-def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, scale=True, stop_at_lines=False, alt_dir_name=None):
+def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=None, down_shift=None, stop_at_lines=False, alt_dir_name=None):
 	for doc_index in range(len(doc_list)):
 		correct_filename = doc_index_to_filename_fun(doc_index)
 		doc = doc_list[doc_index]
 		doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 		# we want to have the option to just find matching lines and save to other filenames
-		doc.fix(scale=scale, stop_at_lines=stop_at_lines)
+		doc.fix(right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines)
 		doc.save(alt_dir_name=alt_dir_name)
 
 # do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None):
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
 	# if there are no hocr files to clean, we should move on
 	if not os.path.isdir(dir_name):
 		return
+	# get the times for this session
+	reading_times = [x for x in sess.metadata if x['part'] == part]
+	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
 	# get the documents for this session
 	documents = []
-	for filename in os.listdir(dir_name):
+	for time in reading_times:
+		filename = time_to_filename(time, extension='hocr')
 		filepath = dir_name + os.sep + filename
 		# don't re-calculate already finished files
 		if not redo:
@@ -73,19 +77,21 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 		return
 	# all the documents in a student session map to one correct document
 	# find that document
-	try:
-		best_match = documents[0].find_correct(word_to_doc)
-	except Exception as e:
-		print sess.id_string, "starts with a file which doesn't match anything"
-		return
+	best_match = None
+	for i in range(len(documents)):
+		try:
+			best_match = documents[i].find_correct(word_to_doc)
+			break
+		except Exception as e:
+			continue
+	if best_match is None:
+		raise Exception('None of the words found by OCR match a document')
 	# make a function that maps every document index to the best match
 	doc_index_to_filename_fun = lambda x : best_match
 	# cleanup all the documents
-	try:
-		cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
-	except Exception as e:
-		print sess.id, "has big issues"
-		return
+	right_shift = settings.x_range[part][0]
+	down_shift = settings.y_range[part][0]
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 
 def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True, stop_at_lines=False, alt_dir_name=None):
 	# get the documents in this directory
@@ -100,7 +106,7 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 		mapping[i] = documents[i].find_correct(word_to_doc)
 	doc_index_to_filename_fun = lambda x : mapping[x]
 	# cleanup all the documents
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, scale=scale, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 
 if __name__ == '__main__':
 	# get the document bags and figure out how long that step takes

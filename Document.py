@@ -337,15 +337,15 @@ class Document:
 				raise Exception('No totally correct lines found')
 
 	# function to make all corrections 
-	def fix(self, scale=True, stop_at_lines=False):
+	def fix(self, right_shift=None, down_shift=None, stop_at_lines=False):
 		self.assign_lines()
 		if not stop_at_lines:
 			self.calc_char_width()
 			for l in self.lines:
 				pairing = l.find_pairing()
 				l.assign_words(pairing)
-		if scale:
-			self.scale(settings.digital_reading_x_range[0], settings.digital_reading_y_range[0], 0.5)
+		if right_shift is not None:
+			self.scale(right_shift, down_shift, 0.5)
 
 	def scale(self, right_shift, down_shift, multiple):
 		for l in self.lines:

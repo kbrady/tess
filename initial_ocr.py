@@ -13,9 +13,9 @@ import subprocess
 # to save the amount of time things take
 import csv
 
-def make_ocr_ready_images(sess, redo=False):
-	digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
-	for reading_interval in digital_reading_times:
+def make_ocr_ready_images(sess, redo=False, part='digital reading'):
+	reading_times = [x for x in sess.metadata if x['part'] == part]
+	for reading_interval in reading_times:
 		for image_time in reading_interval['transitions']:
 			filename = video_to_frames.time_to_filename(image_time)
 			full_path = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + filename
@@ -26,22 +26,22 @@ def make_ocr_ready_images(sess, redo=False):
 			if not os.path.isdir(dir_for_bigger_images):
 				os.mkdir(dir_for_bigger_images)
 			full_path_for_new_image = dir_for_bigger_images + os.sep + filename
-			resize_image(full_path, full_path_for_new_image, redo=redo)
+			resize_image(full_path, full_path_for_new_image, redo=redo, part=part)
 
 def resize_dir(origin_dir, resized_dir, redo=False):
 	for filename in os.listdir(origin_dir):
 		resize_image(origin_dir + os.sep + filename, resized_dir + os.sep + filename, redo=redo)
 
-def resize_image(original_path, resized_path, redo=False):
+def resize_image(original_path, resized_path, redo=False, part='digital reading'):
 	if not redo and os.path.isfile(resized_path):
 		return
-	pic = video_to_frames.get_part_of_picture(original_path, x_range=settings.digital_reading_x_range, y_range=settings.digital_reading_y_range)
+	pic = video_to_frames.get_part_of_picture(original_path, x_range=settings.x_range[part], y_range=settings.y_range[part])
 	bigger_pic = ndimage.zoom(pic, (2, 2, 1), order=0)
 	misc.imsave(resized_path, bigger_pic)
 
-def run_tesseract(sess, redo=False):
-	digital_reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
-	for reading_interval in digital_reading_times:
+def run_tesseract(sess, redo=False, part='digital reading'):
+	reading_times = [x for x in sess.metadata if x['part'] == part]
+	for reading_interval in reading_times:
 		for image_time in reading_interval['transitions']:
 			filename = video_to_frames.time_to_filename(image_time)
 			image_dir = sess.dir_name + os.sep + settings.images_ready_for_ocr

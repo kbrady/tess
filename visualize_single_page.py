@@ -1,3 +1,7 @@
+import matplotlib
+matplotlib.use('Agg')
+# for the linux system
+
 # to read in files
 import os
 # to turn pictures from Piazza! into text which can be mapped to the text found in participant frame images
@@ -14,9 +18,6 @@ from collections import defaultdict
 from collections import Counter
 # for making and reading images
 from matplotlib import pyplot as plt
-# for the linux system
-import matplotlib
-matplotlib.use('Agg')
 from PIL import Image
 # to save mapped values
 import csv

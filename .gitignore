@@ -9,9 +9,14 @@
 *.hocr
 *.xml
 *.mp4
+# A lot of .txt files might get generated just to test stuff
+# We don't want them in version control
+*.txt
 
 # We do however want to some images, hocr and xml files for visualization purposes
 !parts_for_viz/*/*
+!correct_text/*/*
+!requirements.txt
 
 # local paths should not be under version control or there will be conflicts every time
 local_paths.py
@@ -30,7 +35,3 @@ nohup.out
 # Similarly there should be nothing from the virtual environment folder
 venv_folder/*
 
-# A lot of .txt files might get generated just to test stuff
-# We don't want them in version control
-*.txt
-!requirements.txt

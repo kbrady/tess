@@ -11,15 +11,16 @@ import visualize_single_page
 import csv
 import os
 
-def calculate_line_values():
-	# some session ids from the pilot data
-	all_sessions = video_to_frames.get_session_names()
+def calculate_line_values(session_names = None):
+	# the session names
+	if session_names is None:
+		session_names = video_to_frames.get_session_names()
 	# the bags of words for each correct document which will be used to correct the OCR
 	correct_bags = ocr_cleanup.get_correct_bags()
 	# a dictionary from each word to the documents it appears in
 	word_to_doc = ocr_cleanup.make_matching_dictionary(correct_bags)
 
-	for sess_name in all_sessions:
+	for sess_name in session_names:
 		print sess_name
 		t0 = time.time()
 		sess = video_to_frames.Session(sess_name)
@@ -37,14 +38,12 @@ def calculate_line_values():
 		t3 = time.time()
 		print t3 - t2, 'seconds to clean ocr'
 
-def calculate_scrolling():
+def calculate_scrolling(session_names=None):
 	# the session names
-	all_sessions = []
-	with open('scroll_script_output_oct_2017.txt', 'r') as infile:
-		for line in infile:
-			all_sessions.append(line.strip())
+	if session_names is None:
+		session_names = video_to_frames.get_session_names()
 
-	for sess_name in all_sessions:
+	for sess_name in session_names:
 		if not os.path.isdir(settings.data_dir + os.sep + sess_name):
 			continue
 		print sess_name

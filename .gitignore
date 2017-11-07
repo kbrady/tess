@@ -13,6 +13,9 @@
 # We don't want them in version control
 *.txt
 
+# some scripts are written for finding errors on ubuntu computer and shouldn't be passed back and forth
+ubuntu_scripts.py
+
 # We do however want to some images, hocr and xml files for visualization purposes
 !parts_for_viz/*/*
 !correct_text/*/*

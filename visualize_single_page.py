@@ -247,6 +247,9 @@ def plot_scroll(sess, xml_dir_extention=None):
 	plt.fill_between(x_vals_scaled, y_top_vals, y_bottom_vals, alpha=.2)
 	plt.xlabel('Time Since Session Started')
 	plt.ylabel('Vertical Position of Screen')
+	# scale the plot to fit over the image
+	plt.xlim([0, width])
+	plt.ylim([height, 0])
 	# fix x ticks
 	x_tick_vals = plt.xticks()[0]
 	x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals))+min(x_vals) for x in x_tick_vals]

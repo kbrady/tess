@@ -61,6 +61,9 @@ def get_mapping_function(frame_document, viz_document_dict):
 	viz_document = viz_document_dict['womens_suffrage_1_B.png.xml'] if '1' in correct_doc else viz_document_dict['womens_suffrage_2_A.png.xml']
 	try:
 		non_empty_lines = [l for l in frame_document.lines if len(l.updated_line) > 0]
+		# during a zoom we might see only one line from the document
+		if len(non_empty_lines) < 4:
+			return lambda x,y: (0, 0)
 		frame_top, viz_top = point_values(non_empty_lines[1], viz_document, top=True)
 		bottom_index = len(non_empty_lines)-2
 		frame_bottom, viz_bottom = point_values(non_empty_lines[bottom_index], viz_document, top=False)

@@ -45,7 +45,8 @@ class Session:
 			path = path_start + dir_name
 			path = path if path.endswith(os.sep) else path + os.sep
 			for filename in os.listdir(path):
-				filename_part = filename[filename.find('_')+1:]
+				# sometimes the sensor data has a space between Dump_ and the session id
+				filename_part = filename[filename.find('_')+1:].strip()
 				if filename_part.startswith(self.id):
 					# it is posible that one participants id is a substring of another's so we need to check this
 					filename_part = filename_part[len(self.id):]
@@ -442,7 +443,7 @@ def time_action(action, message=''):
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	all_sessions = get_session_names()
-	print all_sessions
+	all_sessions = ['02-05-17 12h36m']
 
 	for sess_name in all_sessions:
 		#if already_made_session(sess_name):

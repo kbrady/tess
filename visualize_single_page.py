@@ -244,10 +244,9 @@ def plot_scroll(sess, xml_dir_extention=None):
 	# plot data on top
 	x_vals, y_top_vals, y_bottom_vals = zip(*data)
 	x_vals_scaled = [(x-min(x_vals))/(max(x_vals)-min(x_vals))*width for x in x_vals]
-	plt.plot(x_vals_scaled, y_top_vals, 'b')
-	plt.plot(x_vals_scaled, y_bottom_vals, 'b')
-	plt.xlabel('Time')
-	plt.ylabel('Top and Bottom of Screen')
+	plt.fill_between(x_vals_scaled, y_top_vals, y_bottom_vals, alpha=.2)
+	plt.xlabel('Time Since Session Started')
+	plt.ylabel('Vertical Position of Screen')
 	# fix x ticks
 	x_tick_vals = plt.xticks()[0]
 	x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals))+min(x_vals) for x in x_tick_vals]

@@ -97,7 +97,7 @@ class Session:
 		if current_time > duration:
 			raise Exception('Time entered was greater than video length')
 		# find the directory to put frames in and create one if it doesn't exist yet
-		dir_name = self.dir_name + os.sep + 'frame-images'
+		dir_name = self.dir_name + os.sep + settings.frame_images_dir
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
 		# 

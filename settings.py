@@ -4,6 +4,7 @@ from local_paths import *
 	# raw_dirs
 	# data_dir
 frame_images_dir = 'frame-images'
+transition_images = 'transition-images'
 metadata_file = 'metadata.json'
 images_ready_for_ocr = 'resized-images'
 hocr_dir = 'hocr-files'

@@ -1,11 +1,23 @@
-# Eye Tracker Pipeline
+# Screen Recroding Reader
 
-This is a pipeline for post processing eye tracker data on students reading from a webpage. I am writing it for studies we are doing at Vanderbilt where the eye tracking software gives us a csv with the x and y positions of a student's eyes on the screen and a video.
+This is a pipeline for processing screen recordings to recognize the text, mouse movements, highlighting and navigation events that happen during them. It can be used to categorize youtube videos, parse data from digital reading experiments or tag your own actions from a personal screen recording.
 
 ## Necessary Software
 In addition to Python 2.7, your system will need the following software packages to run this code:
 - [https://github.com/tesseract-ocr/tesseract](Tessaract)
 - ffmpeg
+
+To install the virtual environment you will need virtualenv-3.5 installed. Then run:
+
+`virtualenv-3.5 venv_folder`
+
+`source venv_folder/bin/activate`
+
+`pip install requirements`
+
+To deactivate run
+
+`deactivate`
 
 ## Settings
 You will need a file called local_paths.py with path names to the directories your data is in and that generated files should be stored in.

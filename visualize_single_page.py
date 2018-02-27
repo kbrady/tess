@@ -29,6 +29,8 @@ import numpy as np
 from scipy import ndimage
 # to define things once
 import settings
+# to make heatmap patches
+from matplotlib import patches
 
 def images_to_xml():
 	# Run tesseract on the website images
@@ -260,6 +262,54 @@ def plot_scroll(sess, xml_dir_extention=None):
 	plt.yticks([], [])
 	plt.savefig(sess.dir_name + os.sep + 'scrolling.png', dpi=800)
 
+# visualize dwell time as a heatmap
+def get_dwell_area(sess, xml_dir_extention=None):
+	# get the corpus
+	corpus = pair_screen_with_eyes.Corpus(sess, xml_dir_extention=xml_dir_extention)
+	if len(corpus.documents) == 0:
+		return [], None
+	# get the correct document for this corpus
+	viz_document_dict = get_viz_documents()
+	data = []
+	# calculate the correct file for visualizing
+	correct_doc = corpus.documents[0].correct_filepath
+	# retrieve the time and top of page values for each document
+	for doc in corpus.documents:
+		t = doc.time
+		mapping_function = get_mapping_function(doc, viz_document_dict)
+		x_left, y_top = mapping_function(settings.x_range['digital reading'][0], settings.y_range['digital reading'][0])
+		x_right, y_bottom = mapping_function(settings.x_range['digital reading'][1], settings.y_range['digital reading'][1])
+		data.append((x_left,x_right,y_top, y_bottom))
+	return data, correct_doc
+
+# need to change from scroll implementation
+def plot_dwell_heatmap(sess, xml_dir_extention=None):
+	# make sure there is nothing still in the figure
+	plt.cla()
+	# get the scrolling data
+	data, correct_doc = get_dwell_area(sess, xml_dir_extention=xml_dir_extention)
+	if len(data) == 0:
+		return
+	# load an image of the file
+	dst_img_path = 'parts_for_viz/resized-images/womens_suffrage_'
+	dst_img_path += '1_B.png' if correct_doc.find('1') != -1 else '2_A.png'
+	dst_img = Image.open(dst_img_path)
+	width, height = dst_img.size
+	# visualize image
+	plt.imshow(dst_img)
+	# plot data
+	for x_left, x_right, y_top, y_bottom in data:
+		# Create a Rectangle patch
+		rect = patches.Rectangle((x_left,y_top),x_right-x_left,y_bottom-y_top, facecolor='b', alpha=1.0/len(data))
+		plt.add_patch(rect)
+	# scale the plot to fit over the image
+	plt.xlim([0, width])
+	plt.ylim([height, 0])
+	# get rid of y ticks
+	plt.yticks([], [])
+	plt.xticks([], [])
+	plt.savefig(sess.dir_name + os.sep + 'dwell_heatmap.png', dpi=800)
+
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	session_even_names = ['second_student_participant', 'sixth_participant'] # 'eighth_participant', 'fourth-participant-second-version', 
@@ -277,7 +327,7 @@ if __name__ == '__main__':
 		hocr_files = len(os.listdir(sess.dir_name + os.sep + 'hocr-files'))
 		xml_files = len(os.listdir(sess.dir_name + os.sep + 'xml-files'))
 		if hocr_files == xml_files:
-			plot_scroll(sess)
+			plot_dwell_heatmap(sess)
 		else:
 			print hocr_files, xml_files
 	

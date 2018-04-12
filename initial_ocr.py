@@ -68,19 +68,20 @@ def run_tesseract_on_dir(picture_dir, hocr_dir, redo=False):
 		run_tesseract_on_image(image_path, hocr_path)
 
 if __name__ == '__main__':
-	run_tesseract_on_dir('../ocr-test-data/tricky-data/original-pictures', '../ocr-test-data/tricky-data/unsized-hocr-files')
-	"""
 	# some session ids from the pilot data
-	all_sessions = video_to_frames.get_session_names()
+	sess_name = 'logging-with-div'
 
-	with open('tesseract_times.csv', 'w') as outputfile:
-		writer = csv.writer(outputfile, delimiter=',', quotechar='"')
-		writer.writerow(['sess_name', 'time'])
-		for sess_name in all_sessions:
-			t0 = time.time()
-			sess = video_to_frames.Session(sess_name)
-			run_tesseract(sess, redo=True)
-			t1 = time.time()
-			writer.writerow([sess_name, t1 - t0])
-	"""
+	sess = video_to_frames.Session(sess_name)
+	make_ocr_ready_images(sess, redo=False, part='typing')
+	run_tesseract(sess, redo=False, part='typing')
+
+	# with open('tesseract_times.csv', 'w') as outputfile:
+	# 	writer = csv.writer(outputfile, delimiter=',', quotechar='"')
+	# 	writer.writerow(['sess_name', 'time'])
+	# 	for sess_name in all_sessions:
+	# 		t0 = time.time()
+	# 		sess = video_to_frames.Session(sess_name)
+	# 		run_tesseract(sess, redo=True)
+	# 		t1 = time.time()
+	# 		writer.writerow([sess_name, t1 - t0])
 

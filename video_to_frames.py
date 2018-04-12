@@ -18,7 +18,7 @@ import subprocess
 
 # A class to keep track of a sessions files
 class Session:
-	def __init__(self, id_string):
+	def __init__(self, id_string, video_sub_dir=''):
 		# this is the string by which this participant will be recognized by from now on
 		self.id = id_string
 		# make a data folder to put things in
@@ -26,8 +26,8 @@ class Session:
 		if not os.path.isdir(self.dir_name):
 			os.mkdir(self.dir_name)
 		# find the files among the raw data that were recorded for this session
-		self.screen_recording_filename = self.calculate_filenames('Screen_Recordings')
-		self.sensor_data_filename = self.calculate_filenames('Sensor_Data')
+		# add a subdirectory to look in if the program needs to look deeper (as in the iMotions data)
+		self.screen_recording_filename = self.calculate_filenames(video_sub_dir)
 		# load any metadata that exists
 		self.metadata = []
 		if os.path.exists(self.dir_name + os.sep + settings.metadata_file):
@@ -47,43 +47,18 @@ class Session:
 			for filename in os.listdir(path):
 				# sometimes the sensor data has a space between Dump_ and the session id
 				filename_part = filename[filename.find('_')+1:].strip()
-				if filename_part.startswith(self.id):
-					# it is posible that one participants id is a substring of another's so we need to check this
-					filename_part = filename_part[len(self.id):]
-					if filename_part.startswith('_Website') or filename_part.startswith('.txt'):
-						output.append(path + filename)
-		# there are multiple dump files because iMotions is stupid
-		if len(output) == 2:
-			parts_1 = output[0].split('Dump')
-			parts_2 = output[1].split('Dump')
-			if parts_1[0] == parts_2[0] and parts_1[1][3:] == parts_2[1][3:]:
-				with open(output[0], 'r') as infile:
-					for line in infile:
-						if line.startswith('#Date : '):
-							date_1 = int(line[len('#Date : '):len('#Date : ')+8])
-							break
-				with open(output[1], 'r') as infile:
-					for line in infile:
-						if line.startswith('#Date : '):
-							date_2 = int(line[len('#Date : '):len('#Date : ')+8])
-							break
-				if date_1 > date_2:
-					os.remove(output[1])
-					output = [output[0]]
-				else:
-					os.remove(output[0])
-					output = [output[1]]
+				if filename.find(self.id) > -1:
+					output.append(path + filename)
+		# it is posible that one participants id is a substring of another's so we should take the shortest filename
+		output.sort(key=len)
 		# exactly one file for each type should be found for each session
-		if len(output) != 1:
+		if len(output) == 0:
 			raise Exception(str(len(output))+' files found for '+self.id+': '+','.join(output))
 		return output[0]
 	
 	# a handy function to see if we got all the raw data right
 	def __repr__(self):
-		output = str(self.name_string) + '\n' 
-		output += str(self.screen_recordings) + '\n'
-		output += str(self.sensor_data)
-		return output
+		return 'Session('+self.id+')'
 
 	# A function to pull out the frame for a given time in the video
 	# switch only_if_frame_does_not_exist on if the program might quit and need to start up again
@@ -100,7 +75,7 @@ class Session:
 		dir_name = self.dir_name + os.sep + settings.frame_images_dir
 		if not os.path.isdir(dir_name):
 			os.mkdir(dir_name)
-		# 
+		# turn the time into a filename of the correct format
 		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
 		command = ['ffmpeg', '-ss']
@@ -123,13 +98,13 @@ class Session:
 	
 	# pull out a frame at 10 second intervals (assumed to be small enough to catch changes)
 	# this appears to be too short for pop-ups
-	def break_into_10_second_chunks(self):
+	def break_into_chunks(self, chunk_size_in_seconds=10):
 		duration = imageio.get_reader(self.screen_recording_filename, 'ffmpeg').get_meta_data()['duration']
 		current_time = 0
-		# pull out frames for every 10 seconds until the end of the video
+		# pull out frames for every chunk_size_in_seconds seconds until the end of the video
 		while current_time < duration:
 			self.screen_time_to_picture(current_time)
-			current_time += 10
+			current_time += chunk_size_in_seconds
 
 	# figure out which part of the stimuli the current frame belongs to
 	# this uses a lot of hard coded methods of assessing whether the part is the same
@@ -345,7 +320,10 @@ def images_different(t1_img, t2_img):
 	
 	return find_box(gray_diff_img)
 
+# need to fix this function
 def figure_out_part_of_stimuli_frame_is_in(image_path):
+	# for now it is all typing
+	return 'typing'
 	pic = np.array(misc.imread(image_path))
 	# cut off the top and bottom parts of the frame which show the address bar and the dock
 	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
@@ -411,7 +389,7 @@ def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=
 # a function to build each session from scratch
 def build_session(sess_name):
 	sess = Session(sess_name)
-	sess.break_into_10_second_chunks()
+	sess.break_into_chunks()
 	sess.find_transitions()
 	sess.calculate_metadata(save_to_file=True)
 	sess.find_digital_reading_transitions()
@@ -442,16 +420,16 @@ def time_action(action, message=''):
 
 if __name__ == '__main__':
 	# some session ids from the pilot data
-	all_sessions = get_session_names()
-	all_sessions = ['02-05-17 12h36m']
+	#all_sessions = get_session_names()
+	all_sessions = ['logging-with-div']
 
 	for sess_name in all_sessions:
 		#if already_made_session(sess_name):
 		#	continue
 		print sess_name
 		sess = time_action(lambda: Session(sess_name), 'time to build session')
-		time_action(lambda: sess.break_into_10_second_chunks(), 'time to break into 10 sec chunks')
+		time_action(lambda: sess.break_into_chunks(), 'time to break into 10 sec chunks')
 		time_action(lambda: sess.find_transitions(), 'time to find transitions')
 		time_action(lambda: sess.calculate_metadata(save_to_file=True), 'time to calculate metadata')
-		time_action(lambda: sess.find_digital_reading_transitions(), 'time to find digital reading transitions')
+		time_action(lambda: sess.find_reading_transitions(part = 'typing'), 'time to find digital reading transitions')
 

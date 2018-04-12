@@ -14,4 +14,4 @@ pytz==2017.2
 scipy==0.19.1
 six==1.10.0
 subprocess32==3.2.7
-xml==0.2.13
+# xml==0.2.13 don't think this is necessary

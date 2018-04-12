@@ -12,11 +12,13 @@ xml_dir = 'xml-files'
 # ranges for various parts of the stimuli
 x_range = {
 	'digital reading': [200, 1200],
-	'form': [676, 1314]
+	'form': [676, 1314],
+	'typing': [0, 2880]
 }
 y_range = {
 	'digital reading': [40, 860],
-	'form': [143, 793]
+	'form': [143, 793],
+	'typing': [0, 1800]
 }
 eye_tracking_word_csv_file = 'eye_tracking.csv'
 eye_tracking_mapped_csv_file = 'mapped_values.csv'

@@ -7,6 +7,8 @@ import csv
 # to make word frequency vectors and store dimensions
 from collections import Counter, defaultdict
 
+global_id_counter = 0
+
 # An object to interpret lines in hocr files
 class Line(Part):
 	def __init__(self, tag, doc, et_parent=None):
@@ -14,11 +16,21 @@ class Line(Part):
 		if tag.has_attr('title'):
 			self.init_to_fix(tag, doc, et_parent)
 		else:
-			self.init_to_read(tag, doc)
+			self.init_to_read(tag, doc, et_parent)
 		
-	def init_to_read(self, tag, doc):
-		self.updated_line = tag['updated_line']
-		self.children = [Word(sub_tag, self) for sub_tag in tag.find_all('word')]
+	def init_to_read(self, tag, doc, et_parent=None):
+		try:
+			self.updated_line = tag['updated_line']
+		except KeyError as e:
+			self.updated_line = None
+		# make an element tree object to save everything as xml
+		self.set_et(et_parent, 'line')
+		# import attrbutes
+		self.attrs = tag.attrs
+		# set attributes in saved version
+		for k in self.attrs:
+			self.et.set(k, self.attrs[k])
+		self.children = [Word(sub_tag, self, self.et) for sub_tag in tag.find_all('word')]
 		self.doc = doc
 
 	def init_to_fix(self, tag, doc, et_parent=None):
@@ -79,7 +91,22 @@ class Line(Part):
 		final_distances = [distances[i]+(len(distances)-i-1)*cost_of_skipping_edge_s2_letters for i in range(len(distances))]
 		return float(min(final_distances))/len(s1)
 
-	def assign_matching(self, string, first_step=False):
+	def assign_matching(self, string, first_step=False, global_id=-1):
+		global global_id_counter
+		if global_id == -1:
+			self.update_with_correct(self, string, first_step)
+		else:
+			if global_id is None:
+				self.set_global_id(str(global_id_counter))
+				global_id_counter += 1
+			else:
+				self.set_global_id(global_id)
+
+	def set_global_id(self, global_id):
+		self.global_id = global_id
+		self.et.set('global_id', global_id)
+
+	def update_with_correct(self, string, first_step=False):
 		self.updated_line = string
 		# we should keep track of line assignments seperately from word assignments
 		# so we can audit the results

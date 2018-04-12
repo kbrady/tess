@@ -17,12 +17,20 @@ class Word(Part):
 		if tag.has_attr('title'):
 			self.init_to_fix(tag, line, et_parent)
 		else:
-			self.init_to_read(tag, line)
+			self.init_to_read(tag, line, et_parent)
 
-	def init_to_read(self, tag, line):
+	def init_to_read(self, tag, line, et_parent=None):
 		self.corrected_text = tag.text
-		self.text = tag.ocr_text
+		self.text = tag.text
 		self.line = line
+		# make an element tree object to save everything as xml
+		self.set_et(et_parent, 'word')
+		self.et.text = self.text
+		# import attrbutes
+		self.attrs = tag.attrs
+		# set attributes in saved version
+		for k in self.attrs:
+			self.et.set(k, self.attrs[k])
 
 	def init_to_fix(self, tag, line, et_parent=None):
 		# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
@@ -93,9 +101,16 @@ class Word(Part):
 		string_distance = self.levenshteinDistance(match_string, s2_edge_cost=.8, s2_mid_cost=1, s1_cost=1, sub_cost=1)
 		return string_distance
 
-	def assign_matching(self, text):
-		self.corrected_text = text
-		self.et.text = text
+	def assign_matching(self, text, global_id=-1):
+		if global_id == -1:
+			self.corrected_text = text
+			self.et.text = text
+		else:
+			self.set_global_id(global_id)
+
+	def set_global_id(self, global_id):
+		self.global_id = global_id
+		self.et.set('global_id', global_id)
 
 	def scale(self, right_shift, down_shift, multiple):
 		self.bbox.scale(right_shift, down_shift, multiple)

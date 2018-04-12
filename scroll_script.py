@@ -24,7 +24,7 @@ def calculate_line_values(session_names = None):
 		print sess_name
 		t0 = time.time()
 		sess = video_to_frames.Session(sess_name)
-		sess.break_into_10_second_chunks()
+		sess.break_into_chunks()
 		sess.find_transitions()
 		sess.calculate_metadata(save_to_file=True)
 		sess.find_digital_reading_transitions()

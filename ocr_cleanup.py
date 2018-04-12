@@ -109,36 +109,29 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 	# cleanup all the documents
 	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 
+def convert_to_xml(sess, part='typing'):
+	# need the session directory path to all the documents
+	dir_name = sess.dir_name + os.sep + settings.hocr_dir
+	# if there are no hocr files to clean, we should move on
+	if not os.path.isdir(dir_name):
+		return
+	# get the documents in this directory
+	documents = []
+	for filename in os.listdir(dir_name):
+		filepath = dir_name + os.sep + filename
+		if filename.endswith('.hocr'):
+			documents.append(Document(filepath))
+	# scale to correct size
+	right_shift = settings.x_range[part][0]
+	down_shift = settings.y_range[part][0]
+	# save documents
+	for doc in documents:
+		doc.scale(right_shift, down_shift, 0.5)
+		doc.save()
+
 if __name__ == '__main__':
-	# get the document bags and figure out how long that step takes
-	t0 = time.time()
-	correct_bags = get_correct_bags()
-	word_to_doc = make_matching_dictionary(correct_bags)
-	t1 = time.time()
-	print 'time getting document bags', t1 - t0
-	# make xml lines
-	input_dir_path = 'parts_for_viz/hocr-files'
-	output_dir_path = 'parts_for_viz/xml-files'
-	cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=False)
-	"""
-	# get the document bags and figure out how long that step takes
-	t0 = time.time()
-	correct_bags = get_correct_bags()
-	word_to_doc = make_matching_dictionary(correct_bags)
-	t1 = time.time()
-	print 'time getting document bags', t1 - t0
-	# fix each session and figure out how long it takes
-	all_sessions = get_session_names()
-	with open('cleanup_times.csv', 'a') as outputfile:
-		writer = csv.writer(outputfile, delimiter=',', quotechar='"')
-		writer.writerow(['sess_name', 'time'])
-		for sess_name in all_sessions:
-			print sess_name
-			t0 = time.time()
-			sess = Session(sess_name)
-			cleanup_session(sess, correct_bags, word_to_doc)
-			t1 = time.time()
-			writer.writerow([sess_name, t1 - t0])
-			outputfile.flush()
-	"""
+	sess_name = 'logging-with-div'
+
+	sess = Session(sess_name)
+	convert_to_xml(sess)
 	

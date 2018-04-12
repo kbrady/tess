@@ -15,38 +15,7 @@ from collections import Counter, namedtuple, defaultdict
 import settings
 
 # An object to interpret hocr files
-class Document:
-	def __init__(self, tesseract_file, xml_dir=None):
-		# save the location of the original file
-		self.tesseract_file = tesseract_file
-		if not tesseract_file.endswith('.hocr'):
-			raise Exception(tesseract_file+' is not of type .hocr')
-		# save the locaiton where corrected files will be saved to
-		# if a value is passed for the xml_dir use that
-		# this happens when we are testing and the tesseract_file is not part of a whole session
-		if xml_dir is None:
-			xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
-		# if we haven't built the xml directory already, make it
-		if not os.path.isdir(xml_dir):
-			os.mkdir(xml_dir)
-		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
-		# make a root to build the xml for the corrected file
-		self.root = ET.Element("root")
-		# open the hocr file and read in the output from tesseract
-		with open(tesseract_file, 'r') as input_file:
-			data = ' '.join([line for line in input_file])
-			soup = BeautifulSoup(data, "html.parser")
-			tag_list = soup.find_all('span', {'class':'ocr_line'})
-			self.lines = [Line(t, self, self.root) for t in tag_list]
-		self.correct_lines = []
-		# create a function to detect lines which are close to the median height
-		self.med_height = np.median([l.bbox.bottom - l.bbox.top for l in self.lines])
-		height_epsilon = self.med_height * .1
-		inside_bounds = lambda x, y, eps: x >= y - eps and x <= y + eps
-		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
-		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
-		# calculate the median space width so it can be used in analysis
-		self.calc_space_width()
+class Document_Meta:
 
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])
@@ -193,13 +162,14 @@ class Document:
 
 	# This is the first half of the assign_lines function.
 	# I made it into it's own function for testing purposes.
-	def get_line_matches(self, testing=False):
-		if len(self.correct_lines) == 0:
+	def get_line_matches(self, testing=False, correcting=True):
+		correct_lines = self.correct_lines if correcting else [str(x) for x in self.prev_lines]
+		if len(correct_lines) == 0:
 			raise RuntimeError('Need to assign correct lines to document')
 		# pair each word with it's line
 		word_pairings = []
-		for i in range(len(self.correct_lines)):
-			for w in self.correct_lines[i].split(' '):
+		for i in range(len(correct_lines)):
+			for w in correct_lines[i].split(' '):
 				if len(w) > 0:
 					word_pairings.append((w,i))
 		word_counts = Counter([x[0] for x in word_pairings])
@@ -224,8 +194,12 @@ class Document:
 		# figure out which lines were matched
 		matched_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		if len(matched_lines) == 0:
-			print self.tesseract_file
+			try:
+				print self.tesseract_file
+			except AttributeError as e:
+				print self.xml_file
 			print self.lines
+			print correct_lines
 			raise RuntimeError('No lines matched')
 		# if we are testing this system return the words which were found too
 		if testing:
@@ -233,10 +207,14 @@ class Document:
 		else:
 			return matched_lines, line_assignments
 
+	def set_prev_lines(self, prev_lines):
+		self.prev_lines = prev_lines
+
 	# this function pairs each OCR line with a corrected string
 	# (blank if nothing good is found)
-	def assign_lines(self, testing=False):
-		matched_lines, line_assignments = self.get_line_matches()
+	def assign_lines(self, testing=False, correcting = True):
+		correct_lines = self.correct_lines if correcting else [str(x) for x in self.prev_lines]
+		matched_lines, line_assignments = self.get_line_matches(correcting=correcting)
 		# make a list of the assignments to be carried out which can be looked at seperately by the tester
 		final_assignment = [-1] * len(self.lines)
 		# fill in missing lines (for the moment assume no mistakes with the original matching step)
@@ -253,8 +231,8 @@ class Document:
 			# look through candidates for the most likely match
 			# make sure indexes stay within the bounds of self.correct_lines
 			# you will need to add 1 to high_index so the loop will work when high_index == low_index
-			for line_index in range(max(low_index, 0), min(high_index+1, len(self.correct_lines))):
-				d = self.lines[i].levenshteinDistance(self.correct_lines[line_index])
+			for line_index in range(max(low_index, 0), min(high_index+1, len(correct_lines))):
+				d = self.lines[i].levenshteinDistance(correct_lines[line_index])
 				if d < distance:
 					distance = d
 					correct_line_index = line_index
@@ -280,9 +258,9 @@ class Document:
 			if len(correct_line_assignment_count[correct_line_index]) > 1:
 				# find the line which is closest to the assigned line
 				best_index = correct_line_assignment_count[correct_line_index][0]
-				best_distance = self.lines[best_index].levenshteinDistance(self.correct_lines[correct_line_index])
+				best_distance = self.lines[best_index].levenshteinDistance(correct_lines[correct_line_index])
 				for i in correct_line_assignment_count[correct_line_index][1:]:
-					distance = self.lines[i].levenshteinDistance(self.correct_lines[correct_line_index])
+					distance = self.lines[i].levenshteinDistance(correct_lines[correct_line_index])
 					if distance < best_distance:
 						best_distance = distance
 						best_index = i
@@ -295,9 +273,11 @@ class Document:
 		for index_pair in enumerate(final_assignment):
 			if index_pair[1] is not None:
 				was_matched_in_first_step = True if self.lines[index_pair[0]] in matched_lines else False
-				self.lines[index_pair[0]].assign_matching(self.correct_lines[index_pair[1]], was_matched_in_first_step)
+				global_id = -1 if correcting else self.prev_lines[index_pair[1]].global_id
+				self.lines[index_pair[0]].assign_matching(correct_lines[index_pair[1]], was_matched_in_first_step, global_id)
 			else:
-				self.lines[index_pair[0]].assign_matching('', False)
+				global_id = -1 if correcting else None
+				self.lines[index_pair[0]].assign_matching('', False, global_id)
 		# if we are testing save the output to a file in the xml directory
 		if testing:
 			with open(self.xml_dir + os.sep + 'line_assignment.csv', 'w') as outputfile:
@@ -308,7 +288,7 @@ class Document:
 					if pair[1] is None:
 						writer.writerow([])
 					else:
-						writer.writerow([self.correct_lines[pair[1]]])
+						writer.writerow([correct_lines[pair[1]]])
 
 	# this function finds the window of assigned lines that this one appears in
 	def find_line_to_assign(self, line_assignments, index, forward=True):
@@ -351,6 +331,21 @@ class Document:
 		for l in self.lines:
 			l.scale(right_shift, down_shift, multiple)
 
+	def pair_to_prev_doc(self, prev_doc, save=True):
+		this_doc_words = [w for l in self.lines for w in l.children]
+		if prev_doc is None:
+			for w in this_doc_words:
+				w.set_global_id(w.id)
+			if save:
+				self.save()
+			return
+		prev_doc_words = [w for l in self.lines for w in l.children]
+		mapping_to_prev = defaultdict(list)
+		for w1 in this_doc_words:
+			for w2 in this_doc_words:
+				if w1.text == w2.text:
+					mapping_to_prev[w1].append(w2)
+
 	def save(self, alt_dir_name=None):
 		if alt_dir_name is not None:
 			sess_dir = os.sep.join(self.xml_file.split(os.sep)[:-2])
@@ -362,3 +357,77 @@ class Document:
 			filepath = self.xml_file
 		tree = ET.ElementTree(self.root)
 		tree.write(filepath)
+
+class Document(Document_Meta):
+	def __init__(self, tesseract_file, xml_dir=None):
+		# save the location of the original file
+		self.tesseract_file = tesseract_file
+		if not tesseract_file.endswith('.hocr'):
+			raise Exception(tesseract_file+' is not of type .hocr')
+		# save the locaiton where corrected files will be saved to
+		# if a value is passed for the xml_dir use that
+		# this happens when we are testing and the tesseract_file is not part of a whole session
+		if xml_dir is None:
+			xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		# if we haven't built the xml directory already, make it
+		if not os.path.isdir(xml_dir):
+			os.mkdir(xml_dir)
+		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
+		# make a root to build the xml for the corrected file
+		self.root = ET.Element("root")
+		# open the hocr file and read in the output from tesseract
+		with open(tesseract_file, 'r') as input_file:
+			data = ' '.join([line for line in input_file])
+			soup = BeautifulSoup(data, "html.parser")
+			tag_list = soup.find_all('span', {'class':'ocr_line'})
+			self.lines = [Line(t, self, self.root) for t in tag_list]
+		self.correct_lines = []
+		# create a function to detect lines which are close to the median height
+		self.med_height = np.median([l.bbox.bottom - l.bbox.top for l in self.lines])
+		height_epsilon = self.med_height * .1
+		inside_bounds = lambda x, y, eps: x >= y - eps and x <= y + eps
+		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
+		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
+		# calculate the median space width so it can be used in analysis
+		self.calc_space_width()
+
+class Document_XML(Document_Meta):
+	def __init__(self, xml_file, dr_time):
+		# make a root to build the xml for any changes
+		self.root = ET.Element("root")
+		# save the transition time (in seconds) for this document so it is easy to refer to
+		self.time = dr_time
+		# save the location of the original file
+		self.xml_file = xml_file
+		with open(xml_file, 'r') as input_file:
+			data = ' '.join([line for line in input_file])
+			soup = BeautifulSoup(data, "html.parser")
+			tag = soup.find('root')
+			# import attrbutes
+			self.attrs = tag.attrs
+			# set attributes in saved version
+			for k in self.attrs:
+				self.et.set(k, self.attrs[k])
+			try:
+				self.correct_filepath = 'correct_text' + os.sep + tag['filename']
+			except KeyError as e:
+				self.correct_filepath = None
+			self.lines = [Line(sub_tag, self, self.root) for sub_tag in tag.find_all('line')]
+
+	def get_word_distance(self, row):
+		list_of_line_strings = [str(l) for l in self.lines]
+		x, y = get_x_y(row)
+		list_of_distances = []
+		with open(self.correct_filepath, 'r') as word_file:
+			for line in word_file:
+				line = line.strip()
+				if x == -1 or y == -1 or line not in list_of_line_strings:
+					list_of_distances += [None] * len(line.split(' '))
+					continue
+				line_index = list_of_line_strings.index(line)
+				list_of_distances += self.lines[line_index].get_distances(x,y)
+		return list_of_distances
+
+	def get_words(self):
+		with open(self.correct_filepath, 'r') as word_file:
+			return [word for line in word_file for word in line.strip().split(' ')]

@@ -1,19 +1,10 @@
-# a class to store, interpret and scale bounding boxes
-class BBox:
-	def __init__(self, info):
-		if type(info) == str or type(info) == unicode:
-			info = [int(x) for x in info.split(' ')]
-		try:
-			self.left, self.top, self.right, self.bottom = info
-		except Exception as e:
-			print type(info)
-			print info
-			raise e
+from TitleAttr import TitleAttr
 
-	def __str__(self):
-		def get_pair(attr_name):
-			return attr_name+': '+str(getattr(self, attr_name))
-		return ' '.join([get_pair(x) for x in ['right', 'top', 'left', 'bottom']])
+# a class to store, interpret and scale bounding boxes
+class BBox(TitleAttr):
+	def __init__(self, name, values):
+		super(self.__class__, self).__init__(name, values)
+		self.left, self.top, self.right, self.bottom = [float(x) for x in self.values]
 
 	def scale(self, right_shift, down_shift, multiple):
 		# stretch by multiple
@@ -28,12 +19,4 @@ class BBox:
 		self.top += down_shift
 		self.bottom += down_shift
 		# update xml object
-		self.set_et(self.et)
-
-	def set_et(self, et):
-		# save this so updates can automatically happen after scaling
-		self.et = et
-		et.set('left', str(self.left))
-		et.set('right', str(self.right))
-		et.set('top', str(self.top))
-		et.set('bottom', str(self.bottom))
+		self.values = [self.left, self.top, self.right, self.bottom]

@@ -1,6 +1,5 @@
 # to inheret class definitions
-from Word import Word
-from Part import Part
+from XML_META import XML_META
 from BBox import BBox
 # to save output from some functions
 import csv
@@ -10,38 +9,11 @@ from collections import Counter, defaultdict
 global_id_counter = 0
 
 # An object to interpret lines in hocr files
-class Line(Part):
-	def __init__(self, tag, doc, et_parent=None):
-		super(self.__class__, self).__init__(tag)
-		if tag.has_attr('title'):
-			self.init_to_fix(tag, doc, et_parent)
-		else:
-			self.init_to_read(tag, doc, et_parent)
-		
-	def init_to_read(self, tag, doc, et_parent=None):
-		try:
-			self.updated_line = tag['updated_line']
-		except KeyError as e:
-			self.updated_line = None
-		# make an element tree object to save everything as xml
-		self.set_et(et_parent, 'line')
-		# import attrbutes
-		self.attrs = tag.attrs
-		# set attributes in saved version
-		for k in self.attrs:
-			self.et.set(k, self.attrs[k])
-		self.children = [Word(sub_tag, self, self.et) for sub_tag in tag.find_all('word')]
-		self.doc = doc
-
-	def init_to_fix(self, tag, doc, et_parent=None):
-		self.updated_line = ''
-		# make an element tree object to save everything as xml
-		self.set_et(et_parent, 'line')
-		# populate children
-		self.children = [Word(sub_tag, self, self.et) for sub_tag in tag.find_all('span', {'class':'ocrx_word'})]
-		# we need a pointer to the document to use character widths
-		# to make the initial mapping
-		self.doc = doc
+class Line(XML_META):
+	def __init__(self, tag, doc, parent=None):
+		super(self.__class__, self).__init__(tag, parent)
+		self.doc = self.get_root()
+		self.updated_line = self.attrs['updated_line'] if 'updated_line' in self.attrs else ''
 	
 	def __repr__(self):
 		return ' '.join([str(word) for word in self.children])
@@ -102,16 +74,12 @@ class Line(Part):
 			else:
 				self.set_global_id(global_id)
 
-	def set_global_id(self, global_id):
-		self.global_id = global_id
-		self.et.set('global_id', global_id)
-
 	def update_with_correct(self, string, first_step=False):
 		self.updated_line = string
 		# we should keep track of line assignments seperately from word assignments
 		# so we can audit the results
-		self.et.set('updated_line', self.updated_line)
-		self.et.set('in_first_step', str(first_step))
+		self.attr['updated_line'] = self.updated_line
+		self.attr['in_first_step'] = str(first_step)
 
 	# estimate word breaks based on character distance
 	def estimate_breaks(self, testing=False):
@@ -123,7 +91,7 @@ class Line(Part):
 		# split up the correct string into word chunks
 		correct_words = self.updated_line.split(' ')
 		# estimate where the word breaks should be
-		offset = self.bbox.left
+		offset = self.title['bbox'].left
 		current_point = 0
 		estimated_breaks = []
 		# go through each word in the correct string and estimate where it
@@ -134,10 +102,10 @@ class Line(Part):
 			# scale lines which are not close to the median height
 			# this assumes other sized fonts are about the same
 			if not self.doc.close_to_median_height(self):
-				scale = float(self.bbox.bottom - self.bbox.top)/self.doc.med_height
+				scale = float(self.title['bbox'].bottom - self.title['bbox'].top)/self.doc.med_height
 			else:
 				scale = 1.0
-			bbox_values = [word_start*scale + offset, self.bbox.top, word_end*scale + offset, self.bbox.bottom]
+			bbox_values = [word_start*scale + offset, self.title['bbox'].top, word_end*scale + offset, self.title['bbox'].bottom]
 			info = ' '.join([str(int(x)) for x in bbox_values])
 			estimated_breaks.append(BBox(info))
 			current_point = word_end + self.doc.space_width
@@ -160,8 +128,8 @@ class Line(Part):
 					right = estimated_breaks[i].right
 					if i in anchor_matchings:
 						anchor_chunk = self.children[anchor_indexes[anchor_matchings.index(i)]]
-						a_left = anchor_chunk.bbox.left
-						a_right = anchor_chunk.bbox.right
+						a_left = anchor_chunk.title['bbox'].left
+						a_right = anchor_chunk.title['bbox'].right
 					else:
 						a_left = None
 						a_right = None
@@ -186,7 +154,7 @@ class Line(Part):
 			est_left = estimated_breaks[i].left
 			est_right = estimated_breaks[i].right
 			# iterate through children until we are in the right balpark
-			while ocr_index < len(self.children) and est_left >= self.children[ocr_index].bbox.right:
+			while ocr_index < len(self.children) and est_left >= self.children[ocr_index].title['bbox'].right:
 				ocr_index += 1
 			# if we have gotten to the end of the line there is nothing more to be done
 			if ocr_index >= len(self.children):
@@ -194,9 +162,9 @@ class Line(Part):
 			current_word = self.children[ocr_index]
 			# check if the overlap is good. If not go to the next word
 			if ocr_index < len(self.children) - 1:
-				if est_right > current_word.bbox.right:
-					current_overlap = current_word.bbox.right - est_left
-					next_overlap = est_right - self.children[ocr_index+1].bbox.left
+				if est_right > current_word.title['bbox'].right:
+					current_overlap = current_word.title['bbox'].right - est_left
+					next_overlap = est_right - self.children[ocr_index+1].title['bbox'].left
 					if next_overlap > current_overlap:
 						ocr_index += 1
 			pairing[ocr_index].append(i)
@@ -430,7 +398,7 @@ class Line(Part):
 				best_difference = difference
 				best_offset = offset
 				pairing = offset_pairing
-		self.et.set('offset', str(best_offset))
+		self.attrs['offset'] = str(best_offset)
 		# if we are testing, save the mapping for inspection
 		if testing:
 			# get the correct words (we only need these in the test case)
@@ -460,10 +428,3 @@ class Line(Part):
 		for ocr_index in range(len(self.children)):
 			corrected_word_text = ' '.join([correct_words[i] for i in pairing[ocr_index]])
 			self.children[ocr_index].assign_matching(corrected_word_text)
-
-	# There are seperate scale functions for lines and words since lines must also
-	# scale children
-	def scale(self, right_shift, down_shift, multiple):
-		self.bbox.scale(right_shift, down_shift, multiple)
-		for word in self.children:
-			word.scale(right_shift, down_shift, multiple)

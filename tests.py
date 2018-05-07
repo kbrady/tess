@@ -10,7 +10,7 @@ from collections import Counter
 
 def line_match_test(hocr_file, correct_filename):
 	correct_bags = ocr_cleanup.get_correct_bags()
-	doc = ocr_cleanup.Document(hocr_file, xml_dir='test-output')
+	doc = ocr_cleanup.Document(hocr_file, output_dir='test-output')
 	doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 	matched_lines, line_assignments, words_found = doc.get_line_matches(testing=True)
 	for hocr_index, correct_index in enumerate(line_assignments):
@@ -23,7 +23,7 @@ def line_match_test(hocr_file, correct_filename):
 
 def line_assignment_test(hocr_file, correct_filename):
 	correct_bags = ocr_cleanup.get_correct_bags()
-	doc = ocr_cleanup.Document(hocr_file, xml_dir='test-output')
+	doc = ocr_cleanup.Document(hocr_file, output_dir='test-output')
 	doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 	assignment = doc.assign_lines(testing=True)
 	# check which lines are matched using the Levinstein Similarity
@@ -40,7 +40,7 @@ def line_assignment_test(hocr_file, correct_filename):
 
 def line_similarity_test(hocr_file, correct_filename):
 	correct_bags = ocr_cleanup.get_correct_bags()
-	doc = ocr_cleanup.Document(hocr_file, xml_dir='test-output')
+	doc = ocr_cleanup.Document(hocr_file, output_dir='test-output')
 	stats_file = 'test-output' + os.sep + hocr_file.split(os.sep)[-1][:-len('.hocr')]+'_sim.csv'
 	with open(stats_file, 'w') as outfile:
 		writer = csv.writer(outfile, delimiter=',', quotechar='"')
@@ -70,7 +70,7 @@ def get_unique_words(correct_file):
 		print ' '.join(ammended_line)
 
 def get_lines(hocr_file):
-	doc = ocr_cleanup.Document(hocr_file, xml_dir='test-output')
+	doc = ocr_cleanup.Document(hocr_file, output_dir='test-output')
 	for l in doc.lines:
 		print l
 
@@ -106,8 +106,8 @@ def compare_lines():
 			print l
 
 if __name__ == '__main__':
-	#line_assignment_test('test-data/sidebar-open.hocr', 'digital_reading_1.txt')
-	#line_assignment_test('test-data/dictionary-open.hocr', 'digital_reading_1.txt')
-	#get_lines('test-data/03-26.6.hocr')
-	#get_unique_words('digital_reading_1.txt')
+	line_assignment_test('test-data/sidebar-open.hocr', 'digital_reading_1.txt')
+	line_assignment_test('test-data/dictionary-open.hocr', 'digital_reading_1.txt')
+	get_lines('test-data/03-26.6.hocr')
+	get_unique_words('digital_reading_1.txt')
 	compare_lines()

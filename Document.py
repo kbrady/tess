@@ -1,4 +1,7 @@
+# to inheret class definitions
+from XML_META import XML_META
 from Line import Line
+from Word import Word
 # to save output from some functions
 import csv
 # to find files and parse paths correctly
@@ -14,8 +17,46 @@ from collections import Counter, namedtuple, defaultdict
 # to set the amount to scale by
 import settings
 
+class_rules = {'ocr_line': Line, 'ocrx_word': Word}
+
 # An object to interpret hocr files
-class Document_Meta:
+class Document(XML_META):
+	def __init__(self, input_file, output_dir=None, time_in_seconds=None):
+		# save the location of the original file
+		self.input_file = input_file
+		if not input_file.endswith('.hocr'):
+			raise Exception(input_file+' is not of type .hocr')
+		# save the locaiton where corrected files will be saved to
+		# if a value is passed for the xml_dir use that
+		# this happens when we are testing and the tesseract_file is not part of a whole session
+		if output_dir is None:
+			output_dir = os.sep.join(input_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		# if we haven't built the xml directory already, make it
+		if not os.path.isdir(output_dir):
+			os.mkdir(output_dir)
+		self.output_file = output_dir + os.sep + input_file.split(os.sep)[-1]
+		# save the time in seconds of this document for later use
+		self.time = time_in_seconds
+		# open the hocr file and read in the output from tesseract
+		with open(self.input_file, 'r') as input_file:
+			data = ' '.join([line for line in input_file])
+			soup = BeautifulSoup(data, "html.parser")
+			# finally build using inheritance
+			super(self.__class__, self).__init__(soup.find('html'), None, class_rules)
+		# have a list of lines to refer to easily
+		self.lines = self.find_all_lines()
+		# if the path to the correct file was previously calucalated, use that
+		self.correct_filepath = 'correct_text' + os.sep + self.attrs.get('filename', None)
+		# something to help calculate the correct lines if they haven't been calculated yet
+		self.correct_lines = []
+		# create a function to detect lines which are close to the median height
+		self.med_height = np.median([l.title['bbox'].bottom - l.title['bbox'].top for l in self.lines])
+		height_epsilon = self.med_height * .1
+		inside_bounds = lambda x, y, eps: x >= y - eps and x <= y + eps
+		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
+		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
+		# calculate the median space width so it can be used in analysis
+		self.calc_space_width()
 
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])
@@ -357,62 +398,6 @@ class Document_Meta:
 			filepath = self.xml_file
 		tree = ET.ElementTree(self.root)
 		tree.write(filepath)
-
-class Document(Document_Meta):
-	def __init__(self, tesseract_file, xml_dir=None):
-		# save the location of the original file
-		self.tesseract_file = tesseract_file
-		if not tesseract_file.endswith('.hocr'):
-			raise Exception(tesseract_file+' is not of type .hocr')
-		# save the locaiton where corrected files will be saved to
-		# if a value is passed for the xml_dir use that
-		# this happens when we are testing and the tesseract_file is not part of a whole session
-		if xml_dir is None:
-			xml_dir = os.sep.join(tesseract_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
-		# if we haven't built the xml directory already, make it
-		if not os.path.isdir(xml_dir):
-			os.mkdir(xml_dir)
-		self.xml_file = xml_dir + os.sep + tesseract_file.split(os.sep)[-1][:-len('.hocr')] + '.xml'
-		# make a root to build the xml for the corrected file
-		self.root = ET.Element("root")
-		# open the hocr file and read in the output from tesseract
-		with open(tesseract_file, 'r') as input_file:
-			data = ' '.join([line for line in input_file])
-			soup = BeautifulSoup(data, "html.parser")
-			tag_list = soup.find_all('span', {'class':'ocr_line'})
-			self.lines = [Line(t, self, self.root) for t in tag_list]
-		self.correct_lines = []
-		# create a function to detect lines which are close to the median height
-		self.med_height = np.median([l.bbox.bottom - l.bbox.top for l in self.lines])
-		height_epsilon = self.med_height * .1
-		inside_bounds = lambda x, y, eps: x >= y - eps and x <= y + eps
-		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
-		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
-		# calculate the median space width so it can be used in analysis
-		self.calc_space_width()
-
-class Document_XML(Document_Meta):
-	def __init__(self, xml_file, dr_time):
-		# make a root to build the xml for any changes
-		self.root = ET.Element("root")
-		# save the transition time (in seconds) for this document so it is easy to refer to
-		self.time = dr_time
-		# save the location of the original file
-		self.xml_file = xml_file
-		with open(xml_file, 'r') as input_file:
-			data = ' '.join([line for line in input_file])
-			soup = BeautifulSoup(data, "html.parser")
-			tag = soup.find('root')
-			# import attrbutes
-			self.attrs = tag.attrs
-			# set attributes in saved version
-			for k in self.attrs:
-				self.et.set(k, self.attrs[k])
-			try:
-				self.correct_filepath = 'correct_text' + os.sep + tag['filename']
-			except KeyError as e:
-				self.correct_filepath = None
-			self.lines = [Line(sub_tag, self, self.root) for sub_tag in tag.find_all('line')]
 
 	def get_word_distance(self, row):
 		list_of_line_strings = [str(l) for l in self.lines]

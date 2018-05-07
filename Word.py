@@ -1,61 +1,14 @@
-from Part import Part
-# to convert characters to ascii
-import unicodedata
-
-# to handle unicode characters that unicodedata doesn't catch
-Replacement_Dict = {u'\u2014':'-'}
-
-def replace_unicode(text):
-	for k in Replacement_Dict:
-		text = text.replace(k, Replacement_Dict[k])
-	return text
+from XML_META import XML_META
 
 # An object to interpret words in hocr files
-class Word(Part):
-	def __init__(self, tag, line, et_parent=None):
-		super(self.__class__, self).__init__(tag)
-		if tag.has_attr('title'):
-			self.init_to_fix(tag, line, et_parent)
-		else:
-			self.init_to_read(tag, line, et_parent)
-
-	def init_to_read(self, tag, line, et_parent=None):
-		self.corrected_text = tag.text
-		self.text = tag.text
-		self.line = line
-		# make an element tree object to save everything as xml
-		self.set_et(et_parent, 'word')
-		self.et.text = self.text
-		# import attrbutes
-		self.attrs = tag.attrs
-		# set attributes in saved version
-		for k in self.attrs:
-			self.et.set(k, self.attrs[k])
-
-	def init_to_fix(self, tag, line, et_parent=None):
-		# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
-		self.text = tag.text
-		self.text = replace_unicode(self.text)
-		self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
-		self.corrected_text = None
-		# save a path to the parent line which will give access to the document
-		# this allows us to use document level statistics such as the width of characters
-		self.line = line
-		# make an element tree object to save everything as xml
-		self.set_et(et_parent, 'word')
-		self.et.set('ocr_text', self.text)
-		self.et.text = self.text
+class Word(XML_META):
+	def __init__(self, tag, parent, class_rules):
+		super(self.__class__, self).__init__(tag, parent, class_rules)
+		if len(self.text) > 0 and 'ocr_text' not in self.attrs:
+			self.attrs['ocr_text'] = self.text
 
 	def __repr__(self):
-		if self.corrected_text is not None:
-			return self.corrected_text
 		return ''.join(filter(lambda x:ord(x) < 128, self.text))
-
-	# a function used by pair_with_eyes
-	def get_distance(self, x, y):
-		x_distance = min(abs(self.bbox.left - x), abs(self.bbox.right - x))
-		y_distance = min(abs(self.bbox.top - y), abs(self.bbox.bottom - y))
-		return (x_distance ** 2 + y_distance ** 2) ** .5
 
 	# I am making a word specific implementation of this so we can have fuzzy
 	# matching for substrings (it is more likely that an OCR word contains two words than partial words)
@@ -103,14 +56,6 @@ class Word(Part):
 
 	def assign_matching(self, text, global_id=-1):
 		if global_id == -1:
-			self.corrected_text = text
-			self.et.text = text
+			self.text = text
 		else:
 			self.set_global_id(global_id)
-
-	def set_global_id(self, global_id):
-		self.global_id = global_id
-		self.et.set('global_id', global_id)
-
-	def scale(self, right_shift, down_shift, multiple):
-		self.bbox.scale(right_shift, down_shift, multiple)

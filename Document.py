@@ -31,6 +31,7 @@ class Document(XML_META):
 		# this happens when we are testing and the tesseract_file is not part of a whole session
 		if output_dir is None:
 			output_dir = os.sep.join(input_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		self.output_dir = output_dir
 		# if we haven't built the xml directory already, make it
 		if not os.path.isdir(output_dir):
 			os.mkdir(output_dir)
@@ -42,11 +43,11 @@ class Document(XML_META):
 			data = ' '.join([line for line in input_file])
 			soup = BeautifulSoup(data, "html.parser")
 			# finally build using inheritance
-			super(self.__class__, self).__init__(soup.find('html'), None, class_rules)
+			super(self.__class__, self).__init__(soup.find('html'), parent=None, class_rules=class_rules)
 		# have a list of lines to refer to easily
 		self.lines = self.find_all_lines()
 		# if the path to the correct file was previously calucalated, use that
-		self.correct_filepath = 'correct_text' + os.sep + self.attrs.get('filename', None)
+		self.correct_filepath = 'correct_text' + os.sep + self.attrs['filename'] if 'filename' in self.attrs else None
 		# something to help calculate the correct lines if they haven't been calculated yet
 		self.correct_lines = []
 		# create a function to detect lines which are close to the median height
@@ -88,14 +89,14 @@ class Document(XML_META):
 					binary_list = [binary_fun(i) for i in range(len(abbrev_doc_sets))]
 					writer.writerow([filename, count] + binary_list)
 		if len(evidence) == 0:
-			print self.xml_file
+			print self.output_file
 			raise Exception('None of the words found by OCR match a document')
 		best_match, count = max(evidence.items(), key=lambda x: x[1])
 		return best_match
 
 	# This function assigns the correct document for fixing this document
 	def assign_correct_bag(self, correct_filename, correct_lines):
-		self.root.set('filename', correct_filename)
+		self.attrs['filename'] = correct_filename
 		self.correct_lines = correct_lines
 
 	# We will use the width of spaces as the default width for characters
@@ -110,7 +111,7 @@ class Document(XML_META):
 			last_chunk = None
 			for c in l.children:
 				if last_chunk is not None:
-					widths.append(c.bbox.left - last_chunk.bbox.right)
+					widths.append(c.title['bbox'].left - last_chunk.title['bbox'].right)
 				last_chunk = c
 		self.space_width = np.median(widths)
 
@@ -134,14 +135,14 @@ class Document(XML_META):
 			perfect_words += [c for c in l.children if correct_word_counts.get(c.text, 0) == 1]
 		# go through chunks and update widths
 		for chunk in perfect_words:
-			word_width = chunk.bbox.right - chunk.bbox.left
+			word_width = chunk.title['bbox'].right - chunk.title['bbox'].left
 			expected_width = sum([self.chr_widths[c] for c in chunk.text])
 			for c in chunk.text:
 				self.chr_widths[c] = self.chr_widths[c] * float(word_width)/expected_width
 				num_words[c] += 1
 		# when testing it is good to see the results as a csv
 		if testing:
-			filename = self.xml_file[:-len('.xml')] + '.csv'
+			filename = self.output_file[:-len('.hocr')] + '.csv'
 			with open(filename, 'w') as output_file:
 				writer = csv.writer(output_file, delimiter=',', quotechar='"')
 				writer.writerow(['Char', 'Width', 'Num Sightings'])
@@ -238,7 +239,7 @@ class Document(XML_META):
 			try:
 				print self.tesseract_file
 			except AttributeError as e:
-				print self.xml_file
+				print self.output_file
 			print self.lines
 			print correct_lines
 			raise RuntimeError('No lines matched')
@@ -321,7 +322,7 @@ class Document(XML_META):
 				self.lines[index_pair[0]].assign_matching('', False, global_id)
 		# if we are testing save the output to a file in the xml directory
 		if testing:
-			with open(self.xml_dir + os.sep + 'line_assignment.csv', 'w') as outputfile:
+			with open(self.output_dir + os.sep + 'line_assignment.csv', 'w') as outputfile:
 				writer = csv.writer(outputfile, delimiter=',', quotechar='"')
 				for pair in enumerate(final_assignment):
 					writer.writerow([self.lines[pair[0]].id])
@@ -387,17 +388,19 @@ class Document(XML_META):
 				if w1.text == w2.text:
 					mapping_to_prev[w1].append(w2)
 
-	def save(self, alt_dir_name=None):
+	def save(self, alt_dir_name=None, use_same_overall_path=True):
 		if alt_dir_name is not None:
-			sess_dir = os.sep.join(self.xml_file.split(os.sep)[:-2])
-			dir_name = sess_dir + os.sep + alt_dir_name
+			if use_same_overall_path:
+				sess_dir = os.sep.join(self.output_dir.split(os.sep)[:-1])
+				dir_name = sess_dir + os.sep + alt_dir_name
+			else:
+				dir_name = alt_dir_name
 			if not os.path.isdir(dir_name):
 				os.mkdir(dir_name)
-			filepath = dir_name + os.sep + self.xml_file.split(os.sep)[-1]
+			filepath = dir_name + os.sep + self.output_file.split(os.sep)[-1]
 		else:
-			filepath = self.xml_file
-		tree = ET.ElementTree(self.root)
-		tree.write(filepath)
+			filepath = self.output_file
+		super(self.__class__, self).save(filepath)
 
 	def get_word_distance(self, row):
 		list_of_line_strings = [str(l) for l in self.lines]

@@ -10,8 +10,8 @@ global_id_counter = 0
 
 # An object to interpret lines in hocr files
 class Line(XML_META):
-	def __init__(self, tag, doc, parent=None):
-		super(self.__class__, self).__init__(tag, parent)
+	def __init__(self, tag, parent=None, class_rules=None):
+		super(self.__class__, self).__init__(tag, parent=parent, class_rules=class_rules)
 		self.doc = self.get_root()
 		self.updated_line = self.attrs['updated_line'] if 'updated_line' in self.attrs else ''
 	
@@ -66,7 +66,7 @@ class Line(XML_META):
 	def assign_matching(self, string, first_step=False, global_id=-1):
 		global global_id_counter
 		if global_id == -1:
-			self.update_with_correct(self, string, first_step)
+			self.update_with_correct(string, first_step)
 		else:
 			if global_id is None:
 				self.set_global_id(str(global_id_counter))
@@ -78,8 +78,8 @@ class Line(XML_META):
 		self.updated_line = string
 		# we should keep track of line assignments seperately from word assignments
 		# so we can audit the results
-		self.attr['updated_line'] = self.updated_line
-		self.attr['in_first_step'] = str(first_step)
+		self.attrs['updated_line'] = self.updated_line
+		self.attrs['in_first_step'] = str(first_step)
 
 	# estimate word breaks based on character distance
 	def estimate_breaks(self, testing=False):
@@ -107,7 +107,7 @@ class Line(XML_META):
 				scale = 1.0
 			bbox_values = [word_start*scale + offset, self.title['bbox'].top, word_end*scale + offset, self.title['bbox'].bottom]
 			info = ' '.join([str(int(x)) for x in bbox_values])
-			estimated_breaks.append(BBox(info))
+			estimated_breaks.append(BBox('bbox', info))
 			current_point = word_end + self.doc.space_width
 		# save results for auditing
 		if testing:

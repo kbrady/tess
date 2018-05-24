@@ -13,12 +13,14 @@ import unicodedata
 Replacement_Dict = {u'\u2014':'-'}
 
 def replace_unicode(text):
+	if text is None:
+		return ''
 	for k in Replacement_Dict:
 		text = text.replace(k, Replacement_Dict[k])
 	return text
 
 # A master template for saving all XML type tags
-class XML_META:
+class XML_META(object):
 	def __init__(self, tag, parent=None, class_rules=None):
 		# read the tag and all it's attributes
 		self.tag_name = tag.name
@@ -41,18 +43,22 @@ class XML_META:
 		# keep track of parents
 		self.parent = parent
 		self.children = []
-		class_ruls = {} if class_rules is None else class_rules
+		class_rules = {} if class_rules is None else class_rules
 		for c in tag.children:
-			if c['class'] in class_rules:
-				class_to_use = class_rules[c['class']]
-				self.children.append(class_to_use(c, self))
-			else:
-				self.children.append(XML_META(c, self))
+			if str(type(c)) != "<class 'bs4.element.Tag'>":
+				continue
+			class_to_use = XML_META
+			for class_val in c.get('class', [None]):
+				if class_val in class_rules:
+					class_to_use = class_rules[class_val]
+					break
+			self.children.append(class_to_use(c, parent=self, class_rules=class_rules))
 
 	# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
 	def clean_text(self):
 		self.text = replace_unicode(self.text)
-		self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
+		if type(self.text) == unicode:
+			self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
 
 	# some functions to interface with the bounding box
 	def width(self):
@@ -78,13 +84,14 @@ class XML_META:
 			et = ET.Element(self.tag_name)
 		# add regular attributes
 		for k in self.attrs:
-			et.set(k, self.attrs[k])
+			val = ' '.join([str(x) for x in self.attrs[k]]) if type(self.attrs[k]) == list else str(self.attrs[k])
+			et.set(k, val)
 		# add title attributes
 		et.set('title', '; '.join([str(x) for x in self.title.values()]))
 		# add text to tag
 		et.text = self.text
 		# add children to et tree
-		for c in self.children():
+		for c in self.children:
 			c.build_et(et)
 		return et
 
@@ -100,7 +107,7 @@ class XML_META:
 		return [c for c in self.get_all_subtags() if condition(c)]
 
 	def find_all_lines(self):
-		return self.find_all(lambda c: c.attrs['class'] == 'ocr_line')
+		return self.find_all(lambda c: 'ocr_line' in c.attrs.get('class', []))
 
 	# function to set id accross frames
 	def set_global_id(self, global_id):
@@ -118,7 +125,7 @@ class XML_META:
 			return self
 		return self.parent.get_root()
 
-	def save(self, filename):
+	def save(self, filepath):
 		et = self.build_et()
-		tree = ET.ElementTree()
-		tree.write(filepath)
+		tree = ET.ElementTree(et)
+		tree.write(filepath, encoding='utf-8')

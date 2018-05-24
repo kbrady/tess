@@ -2,8 +2,8 @@ from XML_META import XML_META
 
 # An object to interpret words in hocr files
 class Word(XML_META):
-	def __init__(self, tag, parent, class_rules):
-		super(self.__class__, self).__init__(tag, parent, class_rules)
+	def __init__(self, tag, parent, class_rules=None):
+		super(self.__class__, self).__init__(tag, parent=parent, class_rules=class_rules)
 		if len(self.text) > 0 and 'ocr_text' not in self.attrs:
 			self.attrs['ocr_text'] = self.text
 

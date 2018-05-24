@@ -14,7 +14,7 @@ RUN echo deb http://ftp.uk.debian.org/debian jessie-backports main >> /etc/apt/s
 RUN apt-get update
 RUN apt-get -f install -y ffmpeg
 
-# Install opencv
+# Install opencv based on instructions at https://www.pyimagesearch.com/2015/06/22/install-opencv-3-0-and-python-2-7-on-ubuntu/
 RUN apt-get install -y build-essential cmake git pkg-config
 RUN apt-get install -y libjpeg62-turbo-dev libtiff5-dev libjasper-dev libpng12-dev
 RUN apt-get install -y libgtk2.0-dev

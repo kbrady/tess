@@ -100,7 +100,7 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 	for filename in os.listdir(input_dir_path):
 		filepath = input_dir_path + os.sep + filename
 		if filename.endswith('.hocr'):
-			documents.append(Document(filepath, xml_dir=output_dir_path))
+			documents.append(Document(filepath, output_dir=output_dir_path))
 	# build the mapping function
 	mapping = {}
 	for i in range(len(documents)):

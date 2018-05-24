@@ -1,4 +1,4 @@
-class TitleAttr:
+class TitleAttr(object):
 	def __init__(self, name, values):
 		self.name = name
 		self.values = [x for x in values.split(' ')]

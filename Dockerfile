@@ -23,6 +23,26 @@ RUN apt-get install -y libatlas-base-dev gfortran
 
 WORKDIR /
 RUN git clone https://github.com/Itseez/opencv.git
+WORKDIR /opencv
+RUN git checkout 3.4.0
+
+WORKDIR /
+RUN git clone https://github.com/Itseez/opencv_contrib.git
+WORKDIR /opencv_contrib
+RUN git checkout 3.4.0
+
+WORKDIR /opencv
+RUN mkdir build
+WORKDIR /opencv/build
+RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
+	-D CMAKE_INSTALL_PREFIX=/usr/local \
+	-D INSTALL_C_EXAMPLES=ON \
+	-D INSTALL_PYTHON_EXAMPLES=ON \
+	-D OPENCV_EXTRA_MODULES_PATH=/opencv_contrib/modules \
+	-D BUILD_EXAMPLES=ON ..
+RUN make -j4
+RUN make install
+RUN ldconfig
 
 WORKDIR /tess
 ENTRYPOINT ["/bin/bash"]

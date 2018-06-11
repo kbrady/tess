@@ -421,7 +421,7 @@ def time_action(action, message=''):
 if __name__ == '__main__':
 	# some session ids from the pilot data
 	#all_sessions = get_session_names()
-	all_sessions = ['logging-with-div']
+	all_sessions = ['video6']
 
 	for sess_name in all_sessions:
 		#if already_made_session(sess_name):

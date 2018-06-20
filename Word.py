@@ -6,6 +6,7 @@ class Word(XML_META):
 		super(self.__class__, self).__init__(tag, parent=parent, class_rules=class_rules)
 		if len(self.text) > 0 and 'ocr_text' not in self.attrs:
 			self.attrs['ocr_text'] = self.text
+		self.children = []
 
 	def __repr__(self):
 		return ''.join(filter(lambda x:ord(x) < 128, self.text))

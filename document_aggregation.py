@@ -81,25 +81,28 @@ def assign_global_ids(sess, part='digital reading'):
 		doc.save(alt_dir_name=alt_dir_name)
 
 if __name__ == '__main__':
-	sess_name = 'Amanda'
-	sess = Session(sess_name)
-	assign_global_ids(sess)
+	for sess_name in os.listdir('data'):
+		if sess_name.startswith('.'):
+			continue
+		print(sess_name)
+		sess = Session(sess_name)
+		assign_global_ids(sess)
 	# check the outcome
-	alt_dir_name = sess.dir_name + os.sep + settings.global_id_dir
-	# get the times for this session
-	reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
-	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
-	reading_times.sort()
-	t = reading_times[-20]
-	xml_path = alt_dir_name + os.sep + time_to_filename(t, extension='hocr')
-	doc = Document(xml_path)
-	# get the word series
-	word_series = [word for line in doc.lines for word in line.children if len(str(word).strip()) > 0]
-	for word in word_series:
-		try:
-			print(word.attrs['global_ids'], str(word))
-		except KeyError as e:
-			print(word)
-			print(word.attrs)
-			print(word.title)
-			raise e
+	# alt_dir_name = sess.dir_name + os.sep + settings.global_id_dir
+	# # get the times for this session
+	# reading_times = [x for x in sess.metadata if x['part'] == 'digital reading']
+	# reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
+	# reading_times.sort()
+	# t = reading_times[-20]
+	# xml_path = alt_dir_name + os.sep + time_to_filename(t, extension='hocr')
+	# doc = Document(xml_path)
+	# # get the word series
+	# word_series = [word for line in doc.lines for word in line.children if len(str(word).strip()) > 0]
+	# for word in word_series:
+	# 	try:
+	# 		print(word.attrs['global_ids'], str(word))
+	# 	except KeyError as e:
+	# 		print(word)
+	# 		print(word.attrs)
+	# 		print(word.title)
+	# 		raise e

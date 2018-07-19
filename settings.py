@@ -10,6 +10,7 @@ images_ready_for_ocr = 'resized-images'
 hocr_dir = 'hocr-files'
 xml_dir = 'xml-files'
 global_id_dir = 'with-id-files'
+highlights_dir = 'with-highlights'
 # ranges for various parts of the stimuli
 x_range = {
 	'digital reading': [200, 1200],

@@ -130,10 +130,11 @@ def convert_to_xml(sess, part='typing'):
 		doc.save()
 
 if __name__ == '__main__':
-	sess_name = 'Amanda'
-
-	sess = Session(sess_name)
-	correct_bags = get_correct_bags()
-	word_to_doc = make_matching_dictionary(correct_bags)
-	cleanup_session(sess, correct_bags, word_to_doc)
+	for sess_name in os.listdir('data'):
+		if sess_name.startswith('.'):
+			continue
+		sess = Session(sess_name)
+		correct_bags = get_correct_bags()
+		word_to_doc = make_matching_dictionary(correct_bags)
+		cleanup_session(sess, correct_bags, word_to_doc)
 	

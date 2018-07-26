@@ -1,26 +1,23 @@
-# Screen Recroding Reader
+# Text-position Evaluation from a Screen-recorded Session (TESS)
 
-This is a pipeline for processing screen recordings to recognize the text, mouse movements, highlighting and navigation events that happen during them. It can be used to categorize youtube videos, parse data from digital reading experiments or tag your own actions from a personal screen recording.
+This is a pipeline for processing screen recordings to recognize text positions, mouse movements, highlighting and navigation events. It can be used to categorize youtube videos, parse data from digital reading experiments or tag your own actions from a personal screen recording.
 
-## Necessary Software
-In addition to Python 2.7, your system will need the following software packages to run this code:
-- [https://github.com/tesseract-ocr/tesseract](Tessaract)
-- ffmpeg
+## Installation
+This pipeline uses several software packages including Python 2.7, [https://github.com/tesseract-ocr/tesseract](Tessaract), ffmpeg, and [https://opencv.org](OpenCV). To install all these packages and their dependencies I have build a Dockerfile.
 
-To install the virtual environment you will need virtualenv-3.5 installed. Then run:
+First you will need to install Docker. You can find installation instructions for your operating system at [https://docs.docker.com/install/](this link).
 
-`virtualenv-3.5 venv_folder`
+If you aren't sure if docker is installed on your system, you can test by attempting to run the hello world image (you may need to add a `sudo` to the front of this command):
 
-`source venv_folder/bin/activate`
+`docker run hello-world`
 
-`pip install requirements`
+Once Docker is installed, run the following command to build the environment for TESS. If you would like to name your environment something other than tess, substatute that name after the `-t`.
 
-To deactivate run
-
-`deactivate`
+`docker build -t tess .`
 
 ## Settings
 You will need a file called local_paths.py with path names to the directories your data is in and that generated files should be stored in.
+
 An example can be seen in local_paths_example.py
 
 ## Modules

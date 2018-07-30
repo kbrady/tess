@@ -63,7 +63,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 		# don't re-calculate already finished files
 		if not redo:
 			alt_dir_name = alt_dir_name if alt_dir_name is not None else settings.xml_dir
-			xml_path = sess.dir_name + os.sep + alt_dir_name + os.sep + filename[:-len('hocr')] + 'xml'
+			xml_path = sess.dir_name + os.sep + alt_dir_name + os.sep + filename
 			if os.path.isfile(xml_path):
 				continue
 		documents.append(Document(filepath))

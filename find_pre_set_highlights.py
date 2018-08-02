@@ -193,12 +193,15 @@ if __name__ == '__main__':
 	if not os.path.isdir('highlights'):
 		os.mkdir('highlights')
 	for sess_name in os.listdir('data'):
-		if sess_name.startswith('.'):
+		if sess_name.startswith('.') or sess_name.endswith('.zip') or sess_name.endswith('.txt') or sess_name == '4657':
 			continue
 		print(sess_name)
 		# filename to save the highlights to
 		filename_to_save_to = 'highlights' + os.sep + sess_name + '.json'
 		sess = Session(sess_name)
+		# find and save the highlights to a dirrectory as a series of hocr files
+		find_all_session_highlights(sess)
+		# read through the resulting hocr files and make a report
 		report = make_report(sess)
 		# save to json file in highlights
 		with open('highlights' + os.sep + sess_name + '.json', 'w') as outputfile:

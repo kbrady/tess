@@ -22,6 +22,8 @@ import cv2
 # to visualize stuff
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
+# to save found highlights
+import json
 
 def get_word_boundries(doc_filepath):
 	doc = Document(doc_filepath)
@@ -187,21 +189,17 @@ def make_report(sess, part='digital reading'):
 	return report
 
 if __name__ == '__main__':
+	# build a directory to save the results in
+	if not os.path.isdir('highlights'):
+		os.mkdir('highlights')
 	for sess_name in os.listdir('data'):
 		if sess_name.startswith('.'):
 			continue
 		print(sess_name)
+		# filename to save the highlights to
+		filename_to_save_to = 'highlights' + os.sep + sess_name + '.json'
 		sess = Session(sess_name)
 		report = make_report(sess)
-		keys = report.keys()
-		keys.sort()
-		for t in keys:
-			time_key = time_to_filename(t, extension='')
-			print('\t{0}'.format(time_key))
-			print('\t{0}'.format(str(report[t])))
-	# for sess_name in os.listdir('data'):
-	# 	if sess_name.startswith('.'):
-	# 		continue
-	# 	print(sess_name)
-	# 	sess = Session(sess_name)
-	# 	find_all_session_highlights(sess)
+		# save to json file in highlights
+		with open('highlights' + os.sep + sess_name + '.json', 'w') as outputfile:
+			json.dump(report, outputfile)

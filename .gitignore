@@ -41,5 +41,8 @@ nohup.out
 # Similarly there should be nothing from the virtual environment folder
 venv_folder/*
 
+# and don't upload the highlights folder (should probably find another path for this)
+highlights/*
+
 # some scripts are just for figuring things out and shouldn't go into the repo
 detect_color.py

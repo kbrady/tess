@@ -15,7 +15,7 @@ from collections import defaultdict
 # to read in xml files
 from Document import Document
 
-def assign_global_ids(sess, part='digital reading'):
+def assign_global_ids(sess, part='digital reading', redo=False):
 	# need the session directory path to all the documents
 	xml_dir_name = sess.dir_name + os.sep + settings.xml_dir
 	alt_dir_name = settings.global_id_dir
@@ -30,6 +30,11 @@ def assign_global_ids(sess, part='digital reading'):
 	word_context_to_id_map = defaultdict(list)
 	largest_id = 0
 	for t in reading_times:
+		# don't recalculate already saved files
+		if not redo:
+			path_to_save_to = alt_dir_name + os.sep + time_to_filename(t, extension='hocr')
+			if os.path.exists(path_to_save_to):
+				continue
 		xml_path = xml_dir_name + os.sep + time_to_filename(t, extension='hocr')
 		doc = Document(xml_path)
 		word_series = [word for line in doc.lines for word in line.children if len(str(word)) > 0]
@@ -82,7 +87,7 @@ def assign_global_ids(sess, part='digital reading'):
 
 if __name__ == '__main__':
 	for sess_name in os.listdir('data'):
-		if sess_name.startswith('.'):
+		if sess_name.startswith('.') or sess_name == '4657':
 			continue
 		print(sess_name)
 		sess = Session(sess_name)

@@ -114,6 +114,9 @@ class Document(XML_META):
 					widths.append(c.title['bbox'].left - last_chunk.title['bbox'].right)
 				last_chunk = c
 		self.space_width = np.median(widths)
+		if np.isnan(self.space_width):
+			print(self.input_file, 'widths', widths)
+			self.space_width = 5.0
 
 	# find the approximate width of each character.
 	# This can be used to make educated decisions about gaps.

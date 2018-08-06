@@ -73,13 +73,13 @@ def get_mapping_function(frame_document, viz_document_dict):
 			bottom_index -= 1
 			frame_bottom, viz_bottom = point_values(non_empty_lines[bottom_index], viz_document, top=False)
 	except Exception as e:
-		print 'Error raised while matching file '+frame_document.xml_filepath
+		print('Error raised while matching file '+frame_document.xml_filepath)
 		raise e
 	if frame_bottom[0] == frame_top[0]:
-		print frame_document.xml_filepath
-		print bottom_index
-		print non_empty_lines[1].bbox
-		print non_empty_lines[-2].bbox
+		print(frame_document.xml_filepath)
+		print(bottom_index)
+		print(non_empty_lines[1].bbox)
+		print(non_empty_lines[-2].bbox)
 		raise Exception('frame_bottom = '+str(frame_bottom)+' and frame_top = '+str(frame_top))
 	x_fun = lambda x : (x-frame_top[0])*float(viz_bottom[0]-viz_top[0])/(frame_bottom[0]-frame_top[0]) + viz_top[0]
 	y_fun = lambda y : (y-frame_top[1])*float(viz_bottom[1]-viz_top[1])/(frame_bottom[1]-frame_top[1]) + viz_top[1]
@@ -316,20 +316,20 @@ if __name__ == '__main__':
 	session_odd_names = ['fifth_participant', 'first_student_participant_second_take','seventh_participant', 'third_student_participant']
 
 	for sess_name in session_even_names + session_odd_names:
-		print sess_name
+		print(sess_name)
 		sess = Session(sess_name)
 		if not os.path.isdir(sess.dir_name + os.sep + 'hocr-files'):
-			print 'no hocr'
+			print('no hocr')
 			continue
 		if not os.path.isdir(sess.dir_name + os.sep + 'xml-files'):
-			print 'no xml'
+			print('no xml')
 			continue
 		hocr_files = len(os.listdir(sess.dir_name + os.sep + 'hocr-files'))
 		xml_files = len(os.listdir(sess.dir_name + os.sep + 'xml-files'))
 		if hocr_files == xml_files:
 			plot_dwell_heatmap(sess)
 		else:
-			print hocr_files, xml_files
+			print(hocr_files, xml_files)
 	
 	# heatmap = make_heatmap(session_odd_names, 'parts_for_viz/resized-images/womens_suffrage_2_A.png')
 	# plot_heatmap(heatmap, 'parts_for_viz/resized-images/womens_suffrage_2_A.png', 'womens_suffrage_2_A_heatmap.png', parts=5)

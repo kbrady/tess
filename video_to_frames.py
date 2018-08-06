@@ -245,7 +245,7 @@ class Session:
 		# might not actually get a middle time due to round off error
 		if middle_time == start_time or middle_time == end_time:
 			return
-		#print (time_to_filename(start_time), time_to_filename(middle_time), time_to_filename(end_time))
+		#print((time_to_filename(start_time), time_to_filename(middle_time), time_to_filename(end_time)))
 		middle_filename = time_to_filename(middle_time)
 		self.screen_time_to_picture(middle_time)
 		middle_value = value_fun(middle_filename)
@@ -415,7 +415,7 @@ def time_action(action, message=''):
 	t0 = time.time()
 	output = action()
 	t1 = time.time()
-	print message, t1 - t0
+	print(message, t1 - t0)
 	return output
 
 if __name__ == '__main__':
@@ -426,7 +426,7 @@ if __name__ == '__main__':
 	for sess_name in all_sessions:
 		#if already_made_session(sess_name):
 		#	continue
-		print sess_name
+		print(sess_name)
 		sess = time_action(lambda: Session(sess_name), 'time to build session')
 		time_action(lambda: sess.break_into_chunks(), 'time to break into 10 sec chunks')
 		time_action(lambda: sess.find_transitions(), 'time to find transitions')

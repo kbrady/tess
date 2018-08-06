@@ -54,7 +54,7 @@ def four_frames_test():
 		for i in range(len(lines)):
 			if lines[i] != correct_lines[i]:
 				raise Exception('lines[{0}] has value\n{1}\n but correct_lines[{0}] has value\n{2}\n for {3}'.format(i, lines[i], correct_lines[i], filename))
-	print 'Four frames test passed'
+	print('Four frames test passed')
 
 if __name__ == '__main__':
 	four_frames_test()

@@ -57,8 +57,8 @@ class XML_META(object):
 	# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
 	def clean_text(self):
 		self.text = replace_unicode(self.text)
-		if type(self.text) == unicode:
-			self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
+		# if type(self.text) == unicode:
+		# 	self.text = unicodedata.normalize('NFKD', self.text).encode('ascii','ignore')
 
 	# some functions to interface with the bounding box
 	def width(self):

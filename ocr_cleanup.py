@@ -68,10 +68,10 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 				continue
 		documents.append(Document(filepath))
 	# get rid of any documents which don't have lines
-	# print out how many of these there are
+	# print(out how many of these there are)
 	have_lines = [d for d in documents if len(d.lines) > 0]
 	if len(have_lines) < len(documents):
-		print len(documents) - len(have_lines), 'bad documents in', dir_name
+		print(len(documents) - len(have_lines), 'bad documents in', dir_name)
 		documents = have_lines
 	# if there are no documents to correct we are done
 	if len(documents) == 0:

@@ -21,7 +21,7 @@ def calculate_line_values(session_names = None):
 	word_to_doc = ocr_cleanup.make_matching_dictionary(correct_bags)
 
 	for sess_name in session_names:
-		print sess_name
+		print(sess_name)
 		t0 = time.time()
 		sess = video_to_frames.Session(sess_name)
 		sess.break_into_chunks()
@@ -29,14 +29,14 @@ def calculate_line_values(session_names = None):
 		sess.calculate_metadata(save_to_file=True)
 		sess.find_digital_reading_transitions()
 		t1 = time.time()
-		print t1 - t0, 'seconds to get frames'
+		print(t1 - t0, 'seconds to get frames')
 		initial_ocr.make_ocr_ready_images(sess)
 		initial_ocr.run_tesseract(sess)
 		t2 = time.time()
-		print t2 - t1, 'seconds to run initial ocr'
+		print(t2 - t1, 'seconds to run initial ocr')
 		ocr_cleanup.cleanup_session(sess, correct_bags, word_to_doc, stop_at_lines=True, alt_dir_name='line_matched')
 		t3 = time.time()
-		print t3 - t2, 'seconds to clean ocr'
+		print(t3 - t2, 'seconds to clean ocr')
 
 def calculate_scrolling(session_names=None):
 	# the session names
@@ -46,7 +46,7 @@ def calculate_scrolling(session_names=None):
 	for sess_name in session_names:
 		if not os.path.isdir(settings.data_dir + os.sep + sess_name):
 			continue
-		print sess_name
+		print(sess_name)
 		sess = video_to_frames.Session(sess_name)
 		if not os.path.isfile(sess.dir_name + os.sep + 'scrolling.csv'):
 			scroll_data, correct_doc = visualize_single_page.get_scroll(sess, xml_dir_extention='line_matched')
@@ -65,16 +65,16 @@ def get_post_test_frames():
 	all_sessions = video_to_frames.get_session_names()
 
 	for sess_name in all_sessions:
-		print sess_name
+		print(sess_name)
 		t0 = time.time()
 		sess = video_to_frames.Session(sess_name)
 		sess.find_form_reading_transitions()
 		t1 = time.time()
-		print t1 - t0, 'seconds to get post test frames'
+		print(t1 - t0, 'seconds to get post test frames')
 		initial_ocr.make_ocr_ready_images(sess, part='form')
 		initial_ocr.run_tesseract(sess, part='form')
 		t2 = time.time()
-		print t2 - t1, 'seconds to run post test initial ocr'
+		print(t2 - t1, 'seconds to run post test initial ocr')
 
 def get_post_test_xml():
 	# some session ids from the pilot data
@@ -85,12 +85,12 @@ def get_post_test_xml():
 	word_to_doc = ocr_cleanup.make_matching_dictionary(correct_bags)
 
 	for sess_name in all_sessions:
-		print sess_name
+		print(sess_name)
 		sess = video_to_frames.Session(sess_name)
 		t2 = time.time()
 		ocr_cleanup.cleanup_session(sess, correct_bags, word_to_doc, part='form', stop_at_lines=True, alt_dir_name='line_matched')
 		t3 = time.time()
-		print t3 - t2, 'seconds to clean form ocr'
+		print(t3 - t2, 'seconds to clean form ocr')
 
 if __name__ == '__main__':
 	calculate_scrolling()

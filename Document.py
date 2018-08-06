@@ -89,7 +89,7 @@ class Document(XML_META):
 					binary_list = [binary_fun(i) for i in range(len(abbrev_doc_sets))]
 					writer.writerow([filename, count] + binary_list)
 		if len(evidence) == 0:
-			print self.output_file
+			print(self.output_file)
 			raise Exception('None of the words found by OCR match a document')
 		best_match, count = max(evidence.items(), key=lambda x: x[1])
 		return best_match
@@ -240,11 +240,11 @@ class Document(XML_META):
 		matched_lines = [self.lines[i] for i in range(len(self.lines)) if line_assignments[i] != -1]
 		if len(matched_lines) == 0:
 			try:
-				print self.tesseract_file
+				print(self.tesseract_file)
 			except AttributeError as e:
-				print self.output_file
-			print self.lines
-			print correct_lines
+				print(self.output_file)
+			print(self.lines)
+			print(correct_lines)
 			raise RuntimeError('No lines matched')
 		# if we are testing this system return the words which were found too
 		if testing:
@@ -354,11 +354,11 @@ class Document(XML_META):
 			if forward:
 				return self.find_line_to_assign(line_assignments, index, forward=False)
 			else:
-				print line_assignments
-				print self.tesseract_file
-				print self.correct_lines
-				print str(self)
-				print set([str(l) for l in self.lines]) & set(self.correct_lines)
+				print(line_assignments)
+				print(self.tesseract_file)
+				print(self.correct_lines)
+				print(str(self))
+				print(set([str(l) for l in self.lines]) & set(self.correct_lines))
 				raise Exception('No totally correct lines found')
 
 	# function to make all corrections 

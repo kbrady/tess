@@ -301,7 +301,7 @@ def find_change_between_pair(sess, file_start_1, file_start_2):
 	print_color_boxes(boxes_1['347'])
 	print('second')
 	print_color_boxes(boxes_2['347'])
-	# print output
+	# print(output)
 	# for k in boxes_2:
 	# 	if k in boxes_1:
 	# 		for color in boxes_2[k]:

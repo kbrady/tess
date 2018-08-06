@@ -74,10 +74,10 @@ def average_fixations(sess_name_filter=lambda x: re.match('[0-9][0-9][0-9][0-9]'
 	measurements, attempts = zip(*student_values)
 	total_measurments = sum(measurements)
 	total_attempts = sum(attempts)
-	print 'fixation measurements per session', float(total_measurments)/len(student_values)
-	print 'percent of attempted measurements successful', float(total_measurments)/total_attempts
-	print 'min fixations', min(measurements)
-	print 'max fixations', max(measurements)
+	print('fixation measurements per session', float(total_measurments)/len(student_values))
+	print('percent of attempted measurements successful', float(total_measurments)/total_attempts)
+	print('min fixations', min(measurements))
+	print('max fixations', max(measurements))
 
 def find_windows(filename):
 	data = get_data(filename)
@@ -91,13 +91,13 @@ def ms_per_fixation(sess_name_filter=lambda x: re.match('[0-9][0-9][0-9][0-9]', 
 	all_windows = [x for l in student_values for x in l] # if x < 100]
 	cuttoff = 100
 	under_cuttoff = [x for x in all_windows if x < cuttoff]
-	print 'frac. lower than', cuttoff, ':', float(len(under_cuttoff))/len(all_windows)
+	print('frac. lower than', cuttoff, ':', float(len(under_cuttoff))/len(all_windows))
 	plt.hist(under_cuttoff)
 	plt.show()
-	print 'frac. lower than', 10, ':', float(len([x for x in under_cuttoff if x < 10]))/len(all_windows)
-	print 'average gap', np.mean(under_cuttoff)
-	print 'median gap', np.median(under_cuttoff)
-	print 'gap std', np.std(under_cuttoff)
+	print('frac. lower than', 10, ':', float(len([x for x in under_cuttoff if x < 10]))/len(all_windows))
+	print('average gap', np.mean(under_cuttoff))
+	print('median gap', np.median(under_cuttoff))
+	print('gap std', np.std(under_cuttoff))
 
 if __name__ == '__main__':
 	ms_per_fixation(sess_name_filter=lambda x : True)

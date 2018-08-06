@@ -2,7 +2,6 @@ beautifulsoup4==4.6.0
 blessings==1.6
 bs4==0.0.1
 cycler==0.10.0
-functools32==3.2.3.post2
 imageio==2.2.0
 matplotlib==2.0.2
 numpy==1.13.0
@@ -13,6 +12,4 @@ python-dateutil==2.6.0
 pytz==2017.2
 scipy==0.19.1
 six==1.10.0
-subprocess32==3.2.7
 imutils
-# xml==0.2.13 don't think this is necessary

@@ -154,4 +154,4 @@ if __name__ == '__main__':
 		pair_eye_tracking_data(sess)
 		break
 	t1 = time.time()
-	print 'time taken', t1 - t0
+	print('time taken', t1 - t0)

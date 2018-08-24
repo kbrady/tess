@@ -258,7 +258,7 @@ def time_to_filename(current_time, extension='jpg'):
 	extension = extension.strip('.')
 	# calculate the minutes and seconds of the time and use these values to create the filename
 	minutes = int(current_time/60)
-	seconds = float(current_time - (minutes * 60))
+	seconds = round(float(current_time - (minutes * 60)), 2)
 	filename = num_to_str(minutes)+'-'+num_to_str(seconds)+'.' + extension
 	return filename
 

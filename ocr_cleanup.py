@@ -109,7 +109,7 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 	# cleanup all the documents
 	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 
-def convert_to_xml(sess, part='typing'):
+def scale_docs(sess, dir_to_save=None, part='typing'):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
 	# if there are no hocr files to clean, we should move on
@@ -120,7 +120,7 @@ def convert_to_xml(sess, part='typing'):
 	for filename in os.listdir(dir_name):
 		filepath = dir_name + os.sep + filename
 		if filename.endswith('.hocr'):
-			documents.append(Document(filepath))
+			documents.append(Document(filepath, output_dir=dir_to_save))
 	# scale to correct size
 	right_shift = settings.x_range[part][0]
 	down_shift = settings.y_range[part][0]
@@ -133,8 +133,10 @@ if __name__ == '__main__':
 	for sess_name in os.listdir('data'):
 		if sess_name.startswith('.'):
 			continue
+		print(sess_name)
 		sess = Session(sess_name)
-		correct_bags = get_correct_bags()
-		word_to_doc = make_matching_dictionary(correct_bags)
-		cleanup_session(sess, correct_bags, word_to_doc)
+		scale_docs(sess, dir_to_save=sess.dir_name + os.sep + 'scale-no-correct', part='digital reading')
+		# correct_bags = get_correct_bags()
+		# word_to_doc = make_matching_dictionary(correct_bags)
+		# cleanup_session(sess, correct_bags, word_to_doc)
 	

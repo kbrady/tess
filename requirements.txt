@@ -13,3 +13,4 @@ pytz==2017.2
 scipy==0.19.1
 six==1.10.0
 imutils
+flask

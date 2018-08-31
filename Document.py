@@ -21,7 +21,7 @@ class_rules = {'ocr_line': Line, 'ocrx_word': Word}
 
 # An object to interpret hocr files
 class Document(XML_META):
-	def __init__(self, input_file, output_dir=None, time_in_seconds=None):
+	def __init__(self, input_file, output_dir=None, time_in_seconds=None, calc_width=True):
 		# save the location of the original file
 		self.input_file = input_file
 		if not input_file.endswith('.hocr'):
@@ -57,7 +57,8 @@ class Document(XML_META):
 		inside_height = lambda x, y, eps: inside_bounds(x.height(), y, eps)
 		self.close_to_median_height = lambda val : inside_height(val, self.med_height, height_epsilon)
 		# calculate the median space width so it can be used in analysis
-		self.calc_space_width()
+		if calc_width:
+			self.calc_space_width()
 
 	def __str__(self):
 		return '\n'.join([str(l) for l in self.lines])

@@ -43,7 +43,7 @@ def get_median_color(img, boolean_array):
 # are more distinguishable (and thus used in text more often) than dark colors
 def threshold_img(img, threshold=150):
 	flat_image = rgb2gray(img)
-  return (flat_image > threshold)
+	return (flat_image > threshold)
 
 # this method uses clustering instead of thresholding
 # it takes longer since KMeans is sequential, but it can seperate images when both
@@ -96,7 +96,27 @@ def find_highlight_color(word, img, no_bolding = False):
 	# get segment to investigate
 	right, left, top, bottom = word.title['bbox'].right, word.title['bbox'].left, word.title['bbox'].top, word.title['bbox'].bottom
 	right, left, top, bottom = int(right), int(left), int(top), int(bottom)
-	img_segment = img[top:bottom, left:right, :]
+	# add three pixels to each side to get more background pixels (for short words)
+	sub_three = lambda x: max([0, x-3])
+	add_three = lambda x, y: min([y, x+3])
+	height, width, _ = img.shape
+	# make sure we aren't violating physics
+	for val in [right, left]:
+		if val >= width:
+			return
+	for val in [top, bottom]:
+		if val >= height:
+			return
+	img_segment = img[sub_three(top):add_three(bottom, height), sub_three(left):add_three(right, width), :]
+	if (img_segment.size < 9):
+		print(right, left, top, bottom)
+		print(word)
+		print(word.attrs)
+		print(img_segment.shape)
+		print(img.shape)
+		print([(sub_three(top), add_three(bottom, height)), (sub_three(left),	add_three(right, width))])
+		mpimg.imsave('tmp.jpg', img_segment)
+		raise Exception('How did this happen')
 	# get the colors associated with this word
 	background_col, foreground_col, background_perc = seperate_image(img_segment)
 	# get the label for this word
@@ -115,17 +135,15 @@ def find_highlights(doc, img_dir_path, no_bolding = False):
 	img = mpimg.imread(img_path)
 	for line in doc.lines:
 		for word in line.children:
-			if 'global_ids' not in word.attrs or len(word.attrs['global_ids']) == 0:
-				continue
 			find_highlight_color(word, img, no_bolding = no_bolding)
 	doc.save()
 
 # find the highlight colors for a session
-def find_all_highlights(sess, part='digital reading', no_bolding = False):
+def find_all_highlights(sess, part='digital reading', no_bolding = False, dir_to_read_from = settings.xml_dir, dir_to_save_to = settings.highlights_dir, recalculate=False):
 	# directory to read documents from
-	with_ids_dir_name = sess.dir_name + os.sep + settings.global_id_dir
+	with_ids_dir_name = sess.dir_name + os.sep + dir_to_read_from
 	# build path for highlights files
-	with_highlights_dir_name = sess.dir_name + os.sep + settings.highlights_dir
+	with_highlights_dir_name = sess.dir_name + os.sep + dir_to_save_to
 	# get directory to pull images from
 	img_dir_path = sess.dir_name + os.sep + settings.frame_images_dir
 	# get times for each document
@@ -133,6 +151,11 @@ def find_all_highlights(sess, part='digital reading', no_bolding = False):
 	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
 	for t in reading_times:
 		xml_path = with_ids_dir_name + os.sep + time_to_filename(t, extension='hocr')
+		# don't recalculate
+		if not recalculate:
+			path_for_saved_doc = with_highlights_dir_name + os.sep + time_to_filename(t, extension='hocr')
+			if os.path.isfile(path_for_saved_doc):
+				continue
 		doc = Document(xml_path, output_dir = with_highlights_dir_name)
 		find_highlights(doc, img_dir_path, no_bolding = no_bolding)
 
@@ -178,8 +201,9 @@ if __name__ == '__main__':
 		if sess_name.startswith('.'):
 			continue
 		sess = Session(sess_name)
-		find_all_highlights(sess)
-		report = make_report(sess)
-		print(sess_name, len(report))
-		with open(sess_name + '.json', 'w') as outfile:
-			outfile.write(json.dumps(report))
+		find_all_highlights(sess, dir_to_read_from = settings.xml_dir, dir_to_save_to = 'highlight-no-ids')
+		find_all_highlights(sess, dir_to_read_from = 'scale-no-correct', dir_to_save_to = 'highlight-no-correction', recalculate=True)
+		# report = make_report(sess)
+		# print(sess_name, len(report))
+		# with open(sess_name + '.json', 'w') as outfile:
+		# 	outfile.write(json.dumps(report))

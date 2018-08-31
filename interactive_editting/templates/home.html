@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
+	<title>
+		Edit Documents
+	</title>
+	<!-- Better CSS -->
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+	<!-- To drag stuff -->
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+  <!-- To draw stuff -->
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+<body>
+	<div id='container'>
+		<div class="jumbotron">
+			<form action="http://localhost:5000/set_session" method="POST">
+		    <div class="input-group mb-3">
+				  <div class="input-group-prepend">
+				    <span class="input-group-text">Editor Name</span>
+				  </div>
+				  <input type="text" name="editor" id="editor_input" aria-label="ditor Name" class="form-control">
+				</div>
+		    <div class="input-group mb-3">
+				  <div class="input-group-prepend">
+				    <label class="input-group-text" for="session">Participant Name</label>
+				  </div>
+				  <select class="custom-select" id="session_select" name="session">
+			      	{% for row in sess_names %}
+							    <option value="{{ row }}">{{ row }}</option>
+							{% endfor %}
+			      </select>
+				</div>
+		    <div class="input-group mb-3">
+				  <div class="input-group-prepend">
+				    <div class="input-group-text">
+				      <input type="checkbox" checked=true name="continue_from_last" aria-label="Checkbox for continueing from last saved position">
+				    </div>
+				  </div>
+				  <label for="continue_from_last" class="form-control">Continue from last saved position</label>
+				</div>
+	 
+	      <!-- Allow form submission with keyboard without duplicating the dialog button -->
+	      <div class="form-group row">
+	      	<button value="submit" class="btn btn-primary">Review Frames</button>
+		    </div>
+		  </form>
+	</div>
+	</div>
+</body>
+</html>

@@ -23,22 +23,33 @@ def word_to_json(word, index):
 	output['global_ids'] = str(index)
 	return output
 
-def is_out_of_bounds(word_dict, img_shape):
+def is_out_of_bounds(word, img_shape):
 	height, width, _ = img_shape
 	# make sure we aren't violating physics
-	for val in ['right', 'left']:
-		if word_dict[val] >= width:
+	for val in [word.title['bbox'].right, word.title['bbox'].left]:
+		if val >= width:
 			return True
-	for val in ['top', 'bottom']:
-		if word_dict[val] >= height:
+	for val in [word.title['bbox'].top, word.title['bbox'].bottom]:
+		if val >= height:
 			return True
 	return False
 
-def word_list_as_json(doc, img_shape):
+def height(word):
+	return word.title['bbox'].bottom - word.title['bbox'].top
+
+def width(word):
+	return word.title['bbox'].right - word.title['bbox'].left
+
+def word_list(doc, img_shape):
 	all_words = [w for l in doc.lines for w in l.children]
-	word_dict = [word_to_json(all_words[i], i) for i in range(len(all_words))]
-	word_dict = [x for x in word_dict if not is_out_of_bounds(x, img_shape)]
-	return word_dict
+	all_words = [x for x in all_words if not is_out_of_bounds(x, img_shape)]
+	all_words.sort(key=lambda x: -width(x) * height(x))
+	all_words = [w for w in all_words if height(w) < 70 and height(w) > 5]
+	return all_words
+
+def word_list_as_json(doc, img_shape):
+	all_words = word_list(doc, img_shape)
+	return [word_to_json(all_words[i], i) for i in range(len(all_words))]
 
 def rgb2hex(rgb):
 	return '#%02x%02x%02x' % rgb
@@ -46,7 +57,7 @@ def rgb2hex(rgb):
 def get_num_highlights(filetime):
 	filepath = sess.dir_name + os.sep + source_dirs[0] + os.sep + time_to_filename(filetime, extension='hocr')
 	doc = Document(filepath, calc_width=False)
-	highlights = Counter([w.attrs['highlight'] for l in doc.lines for w in l.children])
+	highlights = Counter([w.attrs['highlight'] for l in doc.lines for w in l.children if len(w.text) > 0])
 	return highlights
 
 def compare_counts(h_counts1, h_counts2):
@@ -69,7 +80,9 @@ source_dir_index = 0
 @app.route('/')
 def home():
 	sess_names = []
-	for folder_name in os.listdir(settings.data_dir):
+	sess_list = os.listdir(settings.data_dir)
+	sess_list.sort(key=lambda x: 0 if x == 'Amanda' else 1)
+	for folder_name in sess_list:
 		if folder_name.startswith('.'):
 			continue
 		if os.path.isdir(settings.data_dir + os.sep + folder_name):
@@ -92,13 +105,35 @@ def set_session():
 			os.mkdir(editor_folder)
 
 		# get the reading times
-		reading_times = [t for x in sess.metadata for t in x.get('transitions', []) if x['part'] == 'digital reading']
-		# sort according to number of changed highlights
-		highlight_counts = [get_num_highlights(t) for t in reading_times]
-		highlight_keys = [0] + [compare_counts(highlight_counts[i], highlight_counts[i-1]) for i in range(1, len(highlight_counts))]
-		keys_and_times = list(zip(highlight_keys, reading_times))
-		keys_and_times.sort(reverse = True)
-		reading_times = [pair[1] for pair in keys_and_times]
+		# if already saved and sorted, load
+		if os.path.isfile(sess.dir_name + os.sep + 'sorted_reading_times.json'):
+			with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'r') as infile:
+				data = ' '.join([line for line in infile])
+				data = json.loads(data)
+			reading_times = data['reading_times']
+			keys = data['keys']
+		# otherwise read from metadata and sort acording to highlights changed
+		else:
+			reading_times = [t for x in sess.metadata for t in x.get('transitions', []) if x['part'] == 'digital reading']
+			# sort according to number of changed highlights
+			highlight_counts = [get_num_highlights(t) for t in reading_times]
+			highlight_keys = [0] + [compare_counts(highlight_counts[i], highlight_counts[i-1]) for i in range(1, len(highlight_counts))]
+			keys_and_times = list(zip(highlight_keys, reading_times))
+			keys_and_times.sort(reverse = True)
+			reading_times = [pair[1] for pair in keys_and_times]
+			keys = [pair[0] for pair in keys_and_times]
+			# save the sorted times to a file so next time we don't have to calculate it again
+			with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'w') as outfile:
+				json.dump({'reading_times':reading_times, 'keys':keys}, outfile)
+
+		# only look at reading times where the key is greater than 0
+		new_reading_times = []
+		for i in range(len(reading_times)):
+			if keys[i] == 0:
+				break
+			new_reading_times.append(reading_times[i])
+		reading_times = new_reading_times
+
 		# set the index
 		reading_index = 0
 
@@ -111,22 +146,32 @@ def set_session():
 				if reading_index >= len(reading_times):
 					print('done')
 					return redirect('/')
-		return redirect('/doc')
+		return redirect('/doc?reading_index={}'.format(reading_index))
 	# if no data was sent, go home
 	return redirect('/')
 
-@app.route('/doc')
+@app.route('/doc', methods=['GET'])
 def edit_doc():
-	global edit_start_time, source_dir_index
+	global edit_start_time, source_dir_index, reading_index
+	if request.args.get('reading_index') is not None:
+		try:
+			index = int(request.args['reading_index'])
+		except Exception as e:
+			return redirect('/')
+		if index < 0 or index >= len(reading_times):
+			return redirect('/')
+		reading_index = index
+	print('reading_index', reading_index)
 	edit_start_time = time.time()
 	filetime = reading_times[reading_index]
 	# display the already editted document if it exists
-	to_save_to = sess.dir_name + os.sep + editor_folder + os.sep + time_to_filename(filetime, extension='hocr')
+	to_save_to = editor_folder + os.sep + time_to_filename(filetime, extension='hocr')
 	if os.path.isfile(to_save_to):
 		filepath = to_save_to
 	else:
 		source_dir_index = randint(0, len(source_dirs)-1)
 		filepath = sess.dir_name + os.sep + source_dirs[source_dir_index] + os.sep + time_to_filename(filetime, extension='hocr')
+	print('serving from', filepath)
 	doc = Document(filepath)
 	img_path = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + time_to_filename(filetime, extension='jpg')
 	img = mpimg.imread(img_path)
@@ -154,10 +199,13 @@ def save_doc():
 			changes = eval(request.form['changes_dict'])
 		button = request.form['button']
 
+		print('changes', changes)
+
 		# open document
 		filetime = reading_times[reading_index]
 		# open the already editted document if it exists
-		to_save_to = sess.dir_name + os.sep + editor_folder + os.sep + time_to_filename(filetime, extension='hocr')
+		to_save_to = editor_folder + os.sep + time_to_filename(filetime, extension='hocr')
+		print('saving_to', to_save_to)
 		if os.path.isfile(to_save_to):
 			filepath = to_save_to
 		else:
@@ -169,7 +217,11 @@ def save_doc():
 		# record the path of the file that was editted
 		if not os.path.isfile(to_save_to):
 			doc.attrs['editted_from_path'] = filepath
-		all_words = [w for l in doc.lines for w in l.children]
+
+		# get the words with the same order and filters as the page
+		img_path = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + time_to_filename(filetime, extension='jpg')
+		img = mpimg.imread(img_path)
+		all_words = word_list(doc, img.shape)
 
 		# make changes
 		for id_key in changes:
@@ -184,13 +236,13 @@ def save_doc():
 		if button == 'Next':
 			if reading_index + 1 < len(reading_times):
 				reading_index += 1
-				return redirect('/doc')
+				return redirect('/doc?reading_index={}'.format(reading_index))
 			else:
 				return redirect('/')
 		else:
 			if reading_index > 0:
 				reading_index -= 1
-				return redirect('/doc')
+				return redirect('/doc?reading_index={}'.format(reading_index))
 			else:
 				return redirect('/')
 	# if no data was sent, go home

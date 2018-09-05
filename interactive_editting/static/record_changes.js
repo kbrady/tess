@@ -9,6 +9,45 @@ var heightMap = function(d){return d.bottom - d.top;};
 // assign colors
 var cat_color = d3.scale.category10();
 
+// make a legend for the highlight categories
+function makeLegend() {
+	var counter = 0;
+
+	// Label Legend
+	svg.append("text")
+  .attr("dx", 50 + 'px')
+  .attr("dy", 85 + 'px')
+  .style('fill-opacity', .9)
+  .style('fill', 'black')
+  .style('font-size', 18)
+  .text('Highlight Legend:');
+
+	colors.forEach(function(col) {
+		// draw rect
+		svg.append('rect')
+		.attr("x", 50)
+		.attr("y", 95 + counter * 20)
+		.attr("width", 100)
+		.attr("height", 15)
+		.style("stroke", cat_color(col[0])) //D3 does the magic! 
+		.style('fill-opacity', 0)
+		.style('stroke-opacity', 1)
+		.style('stroke-width', 1.5);
+
+		// write label text
+		svg.append("text")
+	  .attr("dx", 55 + 'px')
+	  .attr("dy", 95 + counter * 20 + 12 + 'px')
+	  .style('fill-opacity', .9)
+	  .style('fill', 'black')
+	  .style('font-size', 14)
+	  .text(col[0]);
+
+	  // iterate counter
+	  counter += 1;
+	});
+}
+
 function recordChanges() {
 	var word_id = document.getElementById('global_ids_input').value;
 	var text = document.getElementById('text_input').value;
@@ -30,16 +69,21 @@ function recordChanges() {
 
 function cancelChanges() {
 	var word_id = document.getElementById('global_ids_input').value;
-	if (word_id in changes) {
-		updateWord(word_id, changes[word_id][0], changes[word_id][1]);
-	} else {
-		var my_word = wordInfo.filter(function (d) { return d.global_ids == word_id; })[0];
-		addWord(my_word);
+	if (word_id.length > 0) {
+		if (word_id in changes) {
+			updateWord(word_id, changes[word_id][0], changes[word_id][1]);
+		} else {
+			var my_word = wordInfo.filter(function (d) { return d.global_ids == word_id; })[0];
+			addWord(my_word);
+		}
 	}
 	hidePopup();
 }
 
 function addWord(d) {
+	// make sure the word isn't allready around
+	if (d3.select('#' + to_id(d.global_ids) + '_box')[0][0] != null) { return; }
+	
 	// Draw rectangle
 	svg.append('rect')
 		.attr("class", "bbox")
@@ -107,7 +151,7 @@ function updateWord(word_id, text, color) {
 }
 
 function makePopup(d) {
-	hidePopup();
+	cancelChanges();
 
 	d3.select("#change_value_form")
 	.style('display', 'block')

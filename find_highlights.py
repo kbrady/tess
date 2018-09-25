@@ -22,6 +22,8 @@ from matplotlib import pyplot as plt
 from matplotlib import image as mpimg
 # to save found highlights
 import json
+# if thresholding is bad
+from sklearn.cluster import KMeans
 
 # convert image to grayscale (weight RGB acording to human eye)
 def rgb2gray(rgb):

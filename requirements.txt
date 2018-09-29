@@ -14,3 +14,4 @@ scipy==0.19.1
 six==1.10.0
 imutils
 flask
+sklearn==0.0

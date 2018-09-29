@@ -3,7 +3,7 @@
 This is a pipeline for processing screen recordings to recognize text positions, mouse movements, highlighting and navigation events. It can be used to categorize youtube videos, parse data from digital reading experiments or tag your own actions from a personal screen recording.
 
 ## Installation
-This pipeline uses several software packages including Python 2.7, [https://github.com/tesseract-ocr/tesseract](Tessaract), ffmpeg, and [https://opencv.org](OpenCV). To install all these packages and their dependencies I have build a Dockerfile.
+This pipeline uses several software packages including Python 3.6, [https://github.com/tesseract-ocr/tesseract](Tessaract), and ffmpeg. To install all these packages and their dependencies I have build a Dockerfile.
 
 First you will need to install Docker. You can find installation instructions for your operating system at [https://docs.docker.com/install/](this link).
 
@@ -15,8 +15,14 @@ Once Docker is installed, run the following command to build the environment for
 
 `docker build -t tess .`
 
+To enter the docker environment after building it use the following command
+
+`docker run -it -p 5000:5000 -v $PWD:/tess -v <path-to-your-videos>:/videos tess`
+
 ## Settings
-You will need a file called local_paths.py with path names to the directories your data is in and that generated files should be stored in.
+You will need a file called local_paths.py with 
+
+path names to the directories your data is in and that generated files should be stored in.
 
 An example can be seen in local_paths_example.py
 

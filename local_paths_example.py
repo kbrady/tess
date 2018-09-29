@@ -1,7 +1,6 @@
 raw_dirs = []
-raw_dirs.append('../eye_tracker/eye_tracking-selected/suffrage_a/')
-raw_dirs.append('../eye_tracker/eye_tracking-selected/suffrage_b/')
-data_dir = '../pipeline-data/'
+raw_dirs.append('/videos')
+data_dir = '/tess/data/'
 # highlight colors
 highlight_colors = {'dark blue':(71,148,241), 'yellow':(253, 250, 193), 'light blue':(213, 242, 254), 'white':(245, 245, 245), 'black':(90,90,90)}
 highlight_color_pairs = {

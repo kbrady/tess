@@ -24,9 +24,6 @@ ubuntu_scripts.py
 !correct_text/*/*
 !requirements.txt
 
-# local paths should not be under version control or there will be conflicts every time
-local_paths.py
-
 # No MacOS or compiled BS
 .DS_Store
 .DS_Store?

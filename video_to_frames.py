@@ -18,7 +18,7 @@ import subprocess
 
 # A class to keep track of a sessions files
 class Session:
-	def __init__(self, id_string, video_sub_dir=''):
+	def __init__(self, id_string, screen_recording_path=''):
 		# this is the string by which this participant will be recognized by from now on
 		self.id = id_string
 		# make a data folder to put things in
@@ -27,7 +27,7 @@ class Session:
 			os.mkdir(self.dir_name)
 		# find the files among the raw data that were recorded for this session
 		# add a subdirectory to look in if the program needs to look deeper (as in the iMotions data)
-		self.screen_recording_filename = self.calculate_filenames(video_sub_dir)
+		self.screen_recording_filename = screen_recording_path
 		# load any metadata that exists
 		self.metadata = []
 		if os.path.exists(self.dir_name + os.sep + settings.metadata_file):
@@ -36,25 +36,6 @@ class Session:
 				# sometimes the program gets interupted before a dump is complete
 				if len(json_str) > 5:
 					self.metadata = json.loads(json_str)
-	
-	# calculate the names of any files for this session
-	def calculate_filenames(self, dir_name):
-		output = []
-		# look through the files in both conditions, this makes it easier than remember all the condition pairings
-		for path_start in settings.raw_dirs:
-			path = path_start + dir_name
-			path = path if path.endswith(os.sep) else path + os.sep
-			for filename in os.listdir(path):
-				# sometimes the sensor data has a space between Dump_ and the session id
-				filename_part = filename[filename.find('_')+1:].strip()
-				if filename.find(self.id) > -1:
-					output.append(path + filename)
-		# it is posible that one participants id is a substring of another's so we should take the shortest filename
-		output.sort(key=len)
-		# exactly one file for each type should be found for each session
-		if len(output) == 0:
-			raise Exception(str(len(output))+' files found for '+self.id+': '+','.join(output))
-		return output[0]
 	
 	# a handy function to see if we got all the raw data right
 	def __repr__(self):
@@ -78,7 +59,7 @@ class Session:
 		# turn the time into a filename of the correct format
 		filename = time_to_filename(current_time)
 		# in order to run this you'll need ffmpeg installed. I haven't found a good frame puller in python
-		command = ['ffmpeg', '-ss']
+		command = ['ffmpeg', '-loglevel', 'quiet', '-ss']
 		# calculate the minutes and seconds of the time
 		minutes = int(current_time/60)
 		seconds = current_time - (minutes * 60)
@@ -114,7 +95,7 @@ class Session:
 		if file_list is None:
 			file_list = os.listdir(dir_name)
 		for image_file in file_list:
-			part_of_stimuli = figure_out_part_of_stimuli_frame_is_in(dir_name + os.sep + image_file)
+			part_of_stimuli = settings.figure_out_part_of_stimuli_frame_is_in(dir_name + os.sep + image_file)
 			assignments[image_file] = part_of_stimuli
 		return assignments
 
@@ -320,49 +301,12 @@ def images_different(t1_img, t2_img):
 	
 	return find_box(gray_diff_img)
 
-# need to fix this function
-def figure_out_part_of_stimuli_frame_is_in(image_path):
-	# for now it is all typing
-	return 'typing'
-	pic = np.array(misc.imread(image_path))
-	# cut off the top and bottom parts of the frame which show the address bar and the dock
-	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
-	pic = pic[50:800, :900, :]
-	if is_form(pic):
-		return 'form'
-	else:
-		percent_white = image_has_color(pic, rgb=[255, 255, 255])
-		if percent_white > .8:
-			return 'paper or splash page'
-		elif percent_white > .4:
-			return 'digital reading'
-		else:
-			return 'nothing'
-
 def get_part_of_picture(image_path, x_range, y_range):
 	pic = np.array(misc.imread(image_path))
 	# cut off the top and bottom parts of the frame which show the address bar and the dock
 	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
 	pic = pic[y_range[0]:y_range[1], x_range[0]:x_range[1], :]
 	return pic
-
-def is_form(pic):
-	# only the forms had any purple in them
-	# however some may have purple which is off by an rgb value so we take this into effect
-	# forms should have about 10000 of these pixels at the top
-	if image_has_color(pic, 10000, rgb=[237, 230, 246], epsilon=0):
-		return True
-	# sometimes the form side goes white while loading the next question
-	pic_left = pic[100:600, :600, :]
-	if not image_has_color(pic_left, rgb=[255, 255, 255]) > .99:
-		return False
-	# the other side should have text
-	# we have already estabilshed that the left side is only white pixels, so 
-	# any non-white pixels on the right side tells us we're looking at a page that isn't all white
-	# thus this must be part of the form
-	pic_right = pic[100:600, 700:, :]
-	percent_white_on_right_side = image_has_color(pic_right, rgb=[255, 255, 255])
-	return percent_white_on_right_side < .98
 
 # this is used for the ffmpeg commands and filenames
 # it ads a 0 before the digit of numbers less than 10
@@ -371,65 +315,75 @@ def num_to_str(num):
 		return '0'+str(num)
 	return str(num)
 
-# this is used to identify which part of the webpage a frame belongs to
-# In our studies, the google form pages all had a puruple header which was not present in other pages
-def image_has_color(pic, threashold=None, rgb=[237, 230, 246], upper_threashold=None, epsilon=0):
-	difference_from_color = abs(pic[:,:,0] - rgb[0]) + abs(pic[:,:,1] - rgb[1]) + abs(pic[:,:,2] - rgb[2])
-	num_pixels = sum(sum(difference_from_color <= epsilon))
-	# if no threashold is given return the percentage of pixels that had the specified color
-	if threashold is None:
-		height, width, depth = pic.shape
-		return float(num_pixels)/(height*width)
-	# otherwise return a binary value based on the threasholds
-	if upper_threashold is None:
-		return num_pixels > threashold
-	else:
-		return (num_pixels > threashold) and (num_pixels < upper_threashold)
+def sess_path_to_name(screen_recording_path):
+	for ending in settings.movie_endings:
+		if screen_recording_path.endswith(ending):
+			sess_name = screen_recording_path[:-len(ending)].replace(os.sep, '_')
+			return sess_name
+	raise Exception('{} does not have any of the movie endings listed in settings.py'.format(screen_recording_path))
 
-# a function to build each session from scratch
-def build_session(sess_name):
-	sess = Session(sess_name)
+# a function to build each session from scratch and time how long it takes
+def build_session(screen_recording_path):
+	sess_name = sess_path_to_name(screen_recording_path)
+	time_to_build = {}
+	t0 = time.time()
+	sess = Session(sess_name, settings.raw_dir + os.sep + screen_recording_path)
+	time_to_build['settup_session'] = time.time() - t0
+	t0 = time.time()
 	sess.break_into_chunks()
+	time_to_build['break_into_chunks'] = time.time() - t0
+	t0 = time.time()
 	sess.find_transitions()
+	time_to_build['find_transitions'] = time.time() - t0
+	t0 = time.time()
 	sess.calculate_metadata(save_to_file=True)
+	time_to_build['calculate_metadata'] = time.time() - t0
+	t0 = time.time()
 	sess.find_digital_reading_transitions()
+	time_to_build['find_digital_reading_transitions'] = time.time() - t0
+	return time_to_build, sess_name
 
-def get_session_names():
-	all_sessions = []
-	for foldername in settings.raw_dirs:
-		if not foldername.endswith(os.sep):
-			foldername += os.sep
-		for filename in os.listdir(foldername+'Screen_Recordings'):
-			if filename.find('_Website') == -1:
-				continue
-			sess_name = filename[len('Scene_'):filename.find('_Website')]
-			all_sessions.append(sess_name)
-	return all_sessions
+def get_session_names(from_videos=False):
+	if not from_videos:
+		return list(os.listdir(settings.data_dir))
+	sess_paths = get_session_paths(settings.raw_dir)
+	return [sess_path_to_name(x) for x in sess_paths]
 
 def already_made_session(sess_name):
 	if os.path.isdir(settings.data_dir + sess_name):
 		return True
 	return False
 
-def time_action(action, message=''):
-	t0 = time.time()
-	output = action()
-	t1 = time.time()
-	print(message, t1 - t0)
-	return output
+# get the path to every video
+def get_session_paths(dir_path, recursive=True):
+	paths = []
+	for filename in os.listdir(dir_path):
+		# skip anything that starts with a dot
+		if filename.startswith('.'):
+			continue
+		# add all videos to what gets returned
+		for ending in settings.movie_endings:
+			if filename.endswith(ending):
+				paths.append(filename)
+				break
+		# go into sub directories to find videos
+		if recursive and os.path.isdir(dir_path + os.sep + filename):
+			sub_paths = get_session_paths(dir_path + os.sep + filename, recursive=True)
+			paths += [filename + os.sep + x for x in sub_paths]
+	return paths
+
+# build all the sessions
+def build_all_sessions():
+	if not os.path.isdir(settings.data_dir):
+		os.mkdir(settings.data_dir)
+	# get session paths
+	sess_paths = get_session_paths(settings.raw_dir)
+	# build sessions
+	for screen_recording_path in sess_paths:
+		time_to_build, sess_name = build_session(screen_recording_path)
+		with open(settings.data_dir + sess_name + os.sep + 'time_to_build_sess.json', 'w') as fp:
+			json.dump(time_to_build, fp)
 
 if __name__ == '__main__':
-	# some session ids from the pilot data
-	#all_sessions = get_session_names()
-	all_sessions = ['video6']
-
-	for sess_name in all_sessions:
-		#if already_made_session(sess_name):
-		#	continue
-		print(sess_name)
-		sess = time_action(lambda: Session(sess_name), 'time to build session')
-		time_action(lambda: sess.break_into_chunks(), 'time to break into 10 sec chunks')
-		time_action(lambda: sess.find_transitions(), 'time to find transitions')
-		time_action(lambda: sess.calculate_metadata(save_to_file=True), 'time to calculate metadata')
-		time_action(lambda: sess.find_reading_transitions(part = 'typing'), 'time to find digital reading transitions')
+	build_all_sessions()
 

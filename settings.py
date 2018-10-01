@@ -26,3 +26,5 @@ eye_tracking_word_csv_file = 'eye_tracking.csv'
 eye_tracking_mapped_csv_file = 'mapped_values.csv'
 # a value for heatmaps
 pixels_per_bin = 100
+# possible file endings for screen recordings
+movie_endings = ['.wmv', '.WMV', '.mp3', '.MP3']

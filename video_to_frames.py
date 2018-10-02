@@ -286,8 +286,9 @@ def images_different(t1_img, t2_img):
 		if height < 20 and width < 20:
 			return False
 		# split mat in half
-		mat_l = mat[:, :width/2]
-		mat_r = mat[:, width/2:]
+		half_width = int(width/2)
+		mat_l = mat[:, :half_width]
+		mat_r = mat[:, half_width:]
 		# get results
 		# transpose the matrix so next time we cut top to bottom
 		left_diff = find_box(mat_l.T, depth + 1)

@@ -1,3 +1,7 @@
+# some things to import for the tagging functions
+import numpy as np
+from scipy import misc
+
 # set paths, raw_dir should not end with a file seperator, but data_dir should
 raw_dir = '/videos'
 data_dir = '/tess/data/'
@@ -14,8 +18,6 @@ highlight_color_pairs = {
 # functions for disecting videos
 # need to fix this function
 def figure_out_part_of_stimuli_frame_is_in(image_path):
-	# for now it is all typing
-	return 'typing'
 	pic = np.array(misc.imread(image_path))
 	# cut off the top and bottom parts of the frame which show the address bar and the dock
 	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)

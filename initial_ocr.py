@@ -3,7 +3,7 @@ import os
 # to look in the right places
 import settings
 # to get the session info and find parts of an image
-import video_to_frames
+from video_to_frames import Session, time_to_filename, get_part_of_picture, get_session_names
 # to resize images and save them
 from scipy import ndimage, misc
 # to time the process
@@ -11,13 +11,13 @@ import time
 # to run subprocesses without dealing with spaces etc. by myself
 import subprocess
 # to save the amount of time things take
-import csv
+import json
 
 def make_ocr_ready_images(sess, redo=False, part='digital reading'):
 	reading_times = [x for x in sess.metadata if x['part'] == part]
 	for reading_interval in reading_times:
 		for image_time in reading_interval['transitions']:
-			filename = video_to_frames.time_to_filename(image_time)
+			filename = time_to_filename(image_time)
 			full_path = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + filename
 			# check if we already made this image
 			# (this script may be run multiple times if it didn't finish)
@@ -35,7 +35,7 @@ def resize_dir(origin_dir, resized_dir, redo=False):
 def resize_image(original_path, resized_path, redo=False, part='digital reading'):
 	if not redo and os.path.isfile(resized_path):
 		return
-	pic = video_to_frames.get_part_of_picture(original_path, x_range=settings.x_range[part], y_range=settings.y_range[part])
+	pic = get_part_of_picture(original_path, x_range=settings.x_range[part], y_range=settings.y_range[part])
 	bigger_pic = ndimage.zoom(pic, (2, 2, 1), order=0)
 	misc.imsave(resized_path, bigger_pic)
 
@@ -43,7 +43,7 @@ def run_tesseract(sess, redo=False, part='digital reading'):
 	reading_times = [x for x in sess.metadata if x['part'] == part]
 	for reading_interval in reading_times:
 		for image_time in reading_interval['transitions']:
-			filename = video_to_frames.time_to_filename(image_time)
+			filename = time_to_filename(image_time)
 			image_dir = sess.dir_name + os.sep + settings.images_ready_for_ocr
 			image_path = image_dir + os.sep + filename
 			hocr_dir = sess.dir_name + os.sep + settings.hocr_dir
@@ -67,21 +67,27 @@ def run_tesseract_on_dir(picture_dir, hocr_dir, redo=False):
 		hocr_path = hocr_dir + os.sep + '.'.join(filename.split('.')[:-1])
 		run_tesseract_on_image(image_path, hocr_path)
 
+# run all parts of run inital ocr and time them on each session
+def run_initial_ocr_and_time(sess, part='digital reading'):
+	time_to_build = {}
+	t0 = time.time()
+	make_ocr_ready_images(sess, redo=True, part=part)
+	time_to_build['make_ocr_ready_images'] = time.time() - t0
+	t0 = time.time()
+	run_tesseract(sess, redo=True, part=part)
+	time_to_build['run_tesseract'] = time.time() - t0
+	time_to_build['find_digital_reading_transitions'] = time.time() - t0
+	return time_to_build
+
+def run_initial_ocr_and_time_on_each_session():
+	session_names = get_session_names()
+	for sess_name in session_names:
+		print(sess_name)
+		sess = Session(sess_name)
+		time_to_build = run_initial_ocr_and_time(sess)
+		with open(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json', 'w') as fp:
+			json.dump(time_to_build, fp)
+
 if __name__ == '__main__':
-	# some session ids from the pilot data
-	sess_name = 'logging-with-div'
-
-	sess = video_to_frames.Session(sess_name)
-	make_ocr_ready_images(sess, redo=False, part='typing')
-	run_tesseract(sess, redo=False, part='typing')
-
-	# with open('tesseract_times.csv', 'w') as outputfile:
-	# 	writer = csv.writer(outputfile, delimiter=',', quotechar='"')
-	# 	writer.writerow(['sess_name', 'time'])
-	# 	for sess_name in all_sessions:
-	# 		t0 = time.time()
-	# 		sess = video_to_frames.Session(sess_name)
-	# 		run_tesseract(sess, redo=True)
-	# 		t1 = time.time()
-	# 		writer.writerow([sess_name, t1 - t0])
+	run_initial_ocr_and_time_on_each_session()
 

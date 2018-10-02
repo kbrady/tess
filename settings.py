@@ -22,9 +22,12 @@ y_range = {
 	'form': [143, 793],
 	'typing': [0, 1800]
 }
-eye_tracking_word_csv_file = 'eye_tracking.csv'
+
 eye_tracking_mapped_csv_file = 'mapped_values.csv'
+
 # a value for heatmaps
 pixels_per_bin = 100
+
 # possible file endings for screen recordings
-movie_endings = ['.wmv', '.WMV', '.mp3', '.MP3']
+movie_endings = ['.3g2', '.3gp', '.m2ts', '.mts', '.amv', '.asf', '.avi', '.drc', '.f4a', '.f4b', '.f4p', '.f4v', '.flv', '.gif', '.gifv', '.m2v', '.m4p', '.m4v', '.mkv', '.mng', '.mov', '.mp2', '.mp4', '.mpe', '.mpeg', '.mpg', '.mpv', '.mxf', '.nsv', '.ogg', '.ogv', '.qt', '.rm', '.rmvb', '.roq', '.svi', '.vob', '.webm', '.wmv', '.yuv']
+movie_endings += [x.upper() for x in movie_endings]

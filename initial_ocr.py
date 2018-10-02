@@ -82,7 +82,6 @@ def run_initial_ocr_and_time(sess, part='digital reading'):
 def run_initial_ocr_and_time_on_each_session():
 	session_names = get_session_names()
 	for sess_name in session_names:
-		print(sess_name)
 		sess = Session(sess_name)
 		time_to_build = run_initial_ocr_and_time(sess)
 		with open(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json', 'w') as fp:

@@ -79,10 +79,12 @@ def run_initial_ocr_and_time(sess, part='digital reading'):
 	time_to_build['find_digital_reading_transitions'] = time.time() - t0
 	return time_to_build
 
-def run_initial_ocr_and_time_on_each_session():
+def run_initial_ocr_and_time_on_each_session(redo=False):
 	session_names = get_session_names()
 	for sess_name in session_names:
 		sess = Session(sess_name)
+		if not redo and os.path.isfile(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json'):
+			continue
 		time_to_build = run_initial_ocr_and_time(sess)
 		with open(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json', 'w') as fp:
 			json.dump(time_to_build, fp)

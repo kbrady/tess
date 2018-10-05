@@ -193,10 +193,6 @@ class Line(XML_META):
 		return difference
 
 	def push_out(self, chunk_index, current_pairing, split_1=None, split_2=None):
-		# I don't do a complete search to find if the splits are valid,
-		# but this might be a hard one to catch
-		if split_2 < split_1:
-			raise Exception('split_1 < split_2 but '+str(split_1)+' > '+str(split_2))
 		# get the correct words
 		correct_words = self.updated_line.split(' ')
 		# make a function to pull out word strings
@@ -205,6 +201,10 @@ class Line(XML_META):
 		current_words = indexes_to_words(chunk_index)
 		split_1 = 0 if split_1 is None else split_1
 		split_2 = len(current_words) if split_2 is None else split_2
+		# I don't do a complete search to find if the splits are valid,
+		# but this might be a hard one to catch
+		if split_2 < split_1:
+			raise Exception('split_1 < split_2 but '+str(split_1)+' > '+str(split_2))
 		# calculate the string for each chunk
 		chunk_string_assignments = [(self.children[chunk_index], ' '.join(current_words[split_1:split_2]))]
 		if chunk_index > 0:
@@ -375,7 +375,7 @@ class Line(XML_META):
 		new_pairing = defaultdict(list)
 		for key in pairing:
 			offset_key = key + offset
-			if offset_key >= 0 and offset_key < self.children:
+			if offset_key >= 0 and offset_key < len(self.children):
 				new_pairing[offset_key] = pairing[key]
 		return new_pairing
 

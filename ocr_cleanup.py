@@ -8,8 +8,8 @@ from video_to_frames import Session, get_session_names, time_to_filename
 import time
 # to calculate the standard deviation of dimensions
 import numpy as np
-# to save output from some functions
-import csv
+# to save reading times
+import json
 # to build documents
 from Document import Document
 # to build hash table for document discovery
@@ -45,8 +45,8 @@ def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=
 		doc.fix(right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines)
 		doc.save(alt_dir_name=alt_dir_name)
 
-# do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
+# get the documents for a whole session
+def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading'):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + settings.hocr_dir
 	# if there are no hocr files to clean, we should move on
@@ -57,6 +57,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
 	# get the documents for this session
 	documents = []
+	bad_filepaths = []
 	for time in reading_times:
 		filename = time_to_filename(time, extension='hocr')
 		filepath = dir_name + os.sep + filename
@@ -66,16 +67,22 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 			xml_path = sess.dir_name + os.sep + alt_dir_name + os.sep + filename
 			if os.path.isfile(xml_path):
 				continue
-		documents.append(Document(filepath))
+		# check to make sure the filepath is a valid document
+		try:
+			doc = Document(filepath)
+		except Exception as e:
+			bad_filepaths.append(filepath)
+		documents.append(doc)
 	# get rid of any documents which don't have lines
 	# print(out how many of these there are)
 	have_lines = [d for d in documents if len(d.lines) > 0]
-	if len(have_lines) < len(documents):
-		print(len(documents) - len(have_lines), 'bad documents in', dir_name)
+	if len(bad_filepaths) > 0 or len(have_lines) < len(documents):
+		print(len(bad_filepaths) + len(documents) - len(have_lines), 'bad documents in', dir_name)
 		documents = have_lines
-	# if there are no documents to correct we are done
-	if len(documents) == 0:
-		return
+	return documents
+
+# find the best matching correct document
+def find_best_matching_correct_doc(documents, word_to_doc):
 	# all the documents in a student session map to one correct document
 	# find that document
 	best_match = None
@@ -88,11 +95,30 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 	if best_match is None:
 		raise Exception('None of the words found by OCR match a document')
 	# make a function that maps every document index to the best match
-	doc_index_to_filename_fun = lambda x : best_match
+	return lambda x : best_match
+
+# do the cleanup and save for a whole session
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
+	# time this action
+	time_to_cleanup = {}
+	t0 = time.time()
+	# get the documents to correct
+	documents = get_documents(sess, redo=redo, alt_dir_name=alt_dir_name, part=part)
+	time_to_cleanup['get_documents'] = time.time() - t0
+	# if there are no documents to correct we are done
+	if len(documents) == 0:
+		return time_to_cleanup
+	# get the correct document function
+	t0 = time.time()
+	doc_index_to_filename_fun = find_best_matching_correct_doc(documents, word_to_doc)
+	time_to_cleanup['find_best_matching_correct_doc'] = time.time() - t0
 	# cleanup all the documents
+	t0 = time.time()
 	right_shift = settings.x_range[part][0]
 	down_shift = settings.y_range[part][0]
 	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
+	time_to_cleanup['cleanup_docs'] = time.time() - t0
+	return time_to_cleanup
 
 def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True, stop_at_lines=False, alt_dir_name=None):
 	# get the documents in this directory
@@ -129,14 +155,20 @@ def scale_docs(sess, dir_to_save=None, part='typing'):
 		doc.scale(right_shift, down_shift, 0.5)
 		doc.save()
 
-if __name__ == '__main__':
-	for sess_name in os.listdir('data'):
-		if sess_name.startswith('.'):
-			continue
-		print(sess_name)
+def run_cleanup_session_and_time_on_each_session(redo=False, part='digital reading'):
+	# get the correct bag names
+	correct_bags = get_correct_bags()
+	word_to_doc = make_matching_dictionary(correct_bags)
+	# get the session names
+	session_names = get_session_names()
+	for sess_name in session_names:
 		sess = Session(sess_name)
-		scale_docs(sess, dir_to_save=sess.dir_name + os.sep + 'scale-no-correct', part='digital reading')
-		# correct_bags = get_correct_bags()
-		# word_to_doc = make_matching_dictionary(correct_bags)
-		# cleanup_session(sess, correct_bags, word_to_doc)
+		if not redo and os.path.isfile(sess.dir_name + os.sep + 'time_to_cleanup_ocr.json'):
+			continue
+		time_to_cleanup = cleanup_session(sess, correct_bags, word_to_doc, redo=redo, stop_at_lines=False, alt_dir_name=None, part=part)
+		with open(sess.dir_name + os.sep + 'time_to_cleanup_ocr.json', 'w') as fp:
+			json.dump(time_to_cleanup, fp)
+
+if __name__ == '__main__':
+	run_cleanup_session_and_time_on_each_session()
 	

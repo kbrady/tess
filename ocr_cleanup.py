@@ -42,7 +42,10 @@ def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=
 		doc = doc_list[doc_index]
 		doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 		# we want to have the option to just find matching lines and save to other filenames
-		doc.fix(right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines)
+		try:
+			doc.fix(right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines)
+		except Exception as e:
+			doc.attrs['raised_error'] = 'Raised error while being fixed in cleanup_docs'
 		doc.save(alt_dir_name=alt_dir_name)
 
 # get the documents for a whole session

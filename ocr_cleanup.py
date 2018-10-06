@@ -16,7 +16,7 @@ from Document import Document
 from collections import defaultdict
 
 # get lists of the lines in each correct file
-def get_correct_bags(correct_corpus_directory = 'correct_text/digital_reading'):
+def get_correct_bags(correct_corpus_directory = settings.correct_text_dir):
 	correct_bags = {}
 	for filename in os.listdir(correct_corpus_directory):
 		filepath = correct_corpus_directory + os.sep + filename
@@ -46,12 +46,12 @@ def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=
 		doc.save(alt_dir_name=alt_dir_name)
 
 # get the documents for a whole session
-def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading'):
+def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', source_dir_name=settings.hocr_dir):
 	# need the session directory path to all the documents
-	dir_name = sess.dir_name + os.sep + settings.hocr_dir
+	dir_name = sess.dir_name + os.sep + source_dir_name
 	# if there are no hocr files to clean, we should move on
 	if not os.path.isdir(dir_name):
-		return
+		return []
 	# get the times for this session
 	reading_times = [x for x in sess.metadata if x['part'] == part]
 	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]

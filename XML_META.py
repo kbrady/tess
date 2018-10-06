@@ -54,6 +54,26 @@ class XML_META(object):
 					break
 			self.children.append(class_to_use(c, parent=self, class_rules=class_rules))
 
+	# some attributes are stored in children of the document, this function finds them
+	def find_attribute(self, attr_name):
+		if attr_name in self.attrs:
+			return self.attrs[attr_name]
+		for c in self.children:
+			val = c.find_attribute(attr_name)
+			if val is not None:
+				return val
+		return None
+
+	# some title attributes are stored in children of the document, this function finds them
+	def find_title_attribute(self, attr_name):
+		if attr_name in self.title:
+			return self.title[attr_name].values
+		for c in self.children:
+			val = c.find_title_attribute(attr_name)
+			if val is not None:
+				return val
+		return None
+
 	# set text and clean up by changing all text to ascii (assuming we are working in English for the moment)
 	def clean_text(self):
 		self.text = replace_unicode(self.text)

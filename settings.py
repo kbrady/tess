@@ -11,6 +11,8 @@ hocr_dir = 'hocr-files'
 xml_dir = 'xml-files'
 global_id_dir = 'with-id-files'
 highlights_dir = 'with-highlights'
+correct_text_dir = 'correct_text/digital_reading'
+error_dir = 'error-docs'
 # ranges for various parts of the stimuli
 x_range = {
 	'digital reading': [200, 1200],

@@ -78,7 +78,7 @@ def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', s
 		documents.append(doc)
 	# get rid of any documents which don't have lines
 	# print(out how many of these there are)
-	have_lines = [d for d in documents if len(d.lines) > 0]
+	have_lines = [d for d in documents if (len(d.lines) > 0 and 'raised_error' not in d.attrs)]
 	if len(bad_filepaths) > 0 or len(have_lines) < len(documents):
 		print(len(bad_filepaths) + len(documents) - len(have_lines), 'bad documents in', dir_name)
 		documents = have_lines

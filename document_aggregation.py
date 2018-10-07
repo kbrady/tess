@@ -138,10 +138,12 @@ def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir):
 				for i in range(len(word_series)):
 					word_series[i].attrs['global_ids'] = backtracking_result[i][1]
 				print('Used backtracking to solve {}'.format(str(doc.find_title_attribute('image'))))
+				doc.save()
 				return
 			doc.save(alt_dir_name=error_dir)
 			print('Entered infinite loop for {}'.format(str(doc.find_title_attribute('image'))))
 		unassigned_words = new_unassigned_words
+	doc.save()
 
 # use the correct file to assign global ids
 def assign_global_ids_from_correct_file(sess, part='digital reading', redo=False, error_dir=settings.error_dir):

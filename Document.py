@@ -21,7 +21,7 @@ class_rules = {'ocr_line': Line, 'ocrx_word': Word}
 
 # An object to interpret hocr files
 class Document(XML_META):
-	def __init__(self, input_file, output_dir=None, time_in_seconds=None, calc_width=True):
+	def __init__(self, input_file, output_dir=None, output_dir_relative=False, time_in_seconds=None, calc_width=True):
 		# save the location of the original file
 		self.input_file = input_file
 		if not input_file.endswith('.hocr'):
@@ -31,6 +31,8 @@ class Document(XML_META):
 		# this happens when we are testing and the tesseract_file is not part of a whole session
 		if output_dir is None:
 			output_dir = os.sep.join(input_file.split(os.sep)[:-2]) + os.sep + settings.xml_dir
+		elif output_dir_relative:
+			output_dir = os.sep.join(input_file.split(os.sep)[:-2]) + os.sep + output_dir
 		self.output_dir = output_dir
 		# if we haven't built the xml directory already, make it
 		if not os.path.isdir(output_dir):

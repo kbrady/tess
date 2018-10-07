@@ -72,7 +72,7 @@ def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', s
 				continue
 		# check to make sure the filepath is a valid document
 		try:
-			doc = Document(filepath)
+			doc = Document(filepath, output_dir=alt_dir_name, output_dir_relative=True)
 		except Exception as e:
 			bad_filepaths.append(filepath)
 		documents.append(doc)

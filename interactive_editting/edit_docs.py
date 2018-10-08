@@ -14,6 +14,9 @@ from collections import Counter
 
 app = Flask(__name__)
 
+def sess_name_to_id(sess_name):
+	return sess_name.split('Scene_')[1].split('_Website')[0]
+
 def word_to_json(word, index):
 	output = {}
 	right, left, top, bottom = word.title['bbox'].right, word.title['bbox'].left, word.title['bbox'].top, word.title['bbox'].bottom
@@ -133,7 +136,7 @@ def home():
 		if folder_name.startswith('.'):
 			continue
 		if os.path.isdir(settings.data_dir + os.sep + folder_name):
-			sess_names.append(folder_name)
+			sess_names.append((folder_name, sess_name_to_id(folder_name)))
 
 	return render_template('home.html', sess_names=sess_names)
 

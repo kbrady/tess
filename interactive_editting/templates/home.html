@@ -30,7 +30,7 @@
 				  </div>
 				  <select class="custom-select" id="session_select" name="session">
 			      	{% for row in sess_names %}
-							    <option value="{{ row }}">{{ row }}</option>
+							    <option value="{{ row[0] }}">{{ row[1] }}</option>
 							{% endfor %}
 			      </select>
 				</div>

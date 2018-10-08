@@ -7,6 +7,8 @@ import os
 import settings
 # to get the session info
 from video_to_frames import Session, get_session_names, time_to_filename
+# get each document
+from ocr_cleanup import get_documents
 # to measure how long each session is taking
 import time
 # to calculate the standard deviation of dimensions
@@ -111,14 +113,15 @@ def find_highlight_color(word, img, no_bolding = False):
 			return
 	img_segment = img[sub_three(top):add_three(bottom, height), sub_three(left):add_three(right, width), :]
 	if (img_segment.size < 9):
-		print(right, left, top, bottom)
-		print(word)
-		print(word.attrs)
-		print(img_segment.shape)
-		print(img.shape)
-		print([(sub_three(top), add_three(bottom, height)), (sub_three(left),	add_three(right, width))])
-		mpimg.imsave('tmp.jpg', img_segment)
-		raise Exception('How did this happen')
+		return
+		# print(right, left, top, bottom)
+		# print(word)
+		# print(word.attrs)
+		# print(img_segment.shape)
+		# print(img.shape)
+		# print([(sub_three(top), add_three(bottom, height)), (sub_three(left),	add_three(right, width))])
+		# mpimg.imsave('tmp.jpg', img_segment)
+		# print('Image too small')
 	# get the colors associated with this word
 	background_col, foreground_col, background_perc = seperate_image(img_segment)
 	# get the label for this word
@@ -141,25 +144,32 @@ def find_highlights(doc, img_dir_path, no_bolding = False):
 	doc.save()
 
 # find the highlight colors for a session
-def find_all_highlights(sess, part='digital reading', no_bolding = False, dir_to_read_from = settings.xml_dir, dir_to_save_to = settings.highlights_dir, recalculate=False):
-	# directory to read documents from
-	with_ids_dir_name = sess.dir_name + os.sep + dir_to_read_from
-	# build path for highlights files
-	with_highlights_dir_name = sess.dir_name + os.sep + dir_to_save_to
-	# get directory to pull images from
-	img_dir_path = sess.dir_name + os.sep + settings.frame_images_dir
-	# get times for each document
-	reading_times = [x for x in sess.metadata if x['part'] == part]
-	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
-	for t in reading_times:
-		xml_path = with_ids_dir_name + os.sep + time_to_filename(t, extension='hocr')
-		# don't recalculate
-		if not recalculate:
-			path_for_saved_doc = with_highlights_dir_name + os.sep + time_to_filename(t, extension='hocr')
-			if os.path.isfile(path_for_saved_doc):
-				continue
-		doc = Document(xml_path, output_dir = with_highlights_dir_name)
+def find_all_highlights(sess, part='digital reading', img_dir_path=settings.frame_images_dir, no_bolding = False, dir_to_read_from = settings.global_id_dir, dir_to_save_to = settings.highlights_dir, recalculate=False):
+	# get documents
+	documents = get_documents(sess, redo=recalculate, alt_dir_name=dir_to_save_to, source_dir_name=dir_to_read_from, part=part)
+	# get the right path to images
+	img_dir_path = sess.dir_name + os.sep + img_dir_path
+	# fing highlights for each document
+	for doc in documents:
 		find_highlights(doc, img_dir_path, no_bolding = no_bolding)
+
+def find_highlights_for_each_session(no_bolding=False, img_dir_path=settings.frame_images_dir, part='digital reading', dir_to_read_from = settings.global_id_dir, dir_to_save_to = settings.highlights_dir, recalculate=False):
+	# get the session names
+	session_names = get_session_names()
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		# avoid sessions where the corrections have not been completely calculated
+		if not os.path.isfile(sess.dir_name + os.sep + 'time_to_assign_ids.json'):
+			continue
+		# don't recalculate
+		if not recalculate and os.path.isfile(sess.dir_name + os.sep + 'time_to_find_highlights.json'):
+			continue
+		time_to_find_highlights = {}
+		t0 = time.time()
+		find_all_highlights(sess, part=part, no_bolding = no_bolding, img_dir_path=img_dir_path, dir_to_read_from = dir_to_read_from, dir_to_save_to = dir_to_save_to, recalculate=recalculate)
+		time_to_find_highlights['find_all_highlights'] = time.time() - t0
+		with open(sess.dir_name + os.sep + 'time_to_find_highlights.json', 'w') as fp:
+			json.dump(time_to_find_highlights, fp)
 
 # make a report of when highlights were made and editted
 def make_report(sess, part='digital reading'):
@@ -199,13 +209,4 @@ def make_report(sess, part='digital reading'):
 	return report
 
 if __name__ == '__main__':
-	for sess_name in os.listdir('data'):
-		if sess_name.startswith('.'):
-			continue
-		sess = Session(sess_name)
-		find_all_highlights(sess, dir_to_read_from = settings.xml_dir, dir_to_save_to = 'highlight-no-ids')
-		find_all_highlights(sess, dir_to_read_from = 'scale-no-correct', dir_to_save_to = 'highlight-no-correction', recalculate=True)
-		# report = make_report(sess)
-		# print(sess_name, len(report))
-		# with open(sess_name + '.json', 'w') as outfile:
-		# 	outfile.write(json.dumps(report))
+	find_highlights_for_each_session()

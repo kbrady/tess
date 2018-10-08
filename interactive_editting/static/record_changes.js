@@ -53,7 +53,7 @@ function recordChanges() {
 	var text = document.getElementById('text_input').value;
 	var color = '';
 	var select = document.getElementById('highlight_select');
-	select.childNodes.forEach(function(option) {
+	Array.prototype.slice.call(select.childNodes).forEach(function(option) {
 		if (option.tagName == 'OPTION') {
 			if (option.selected) {
 				color = option.value;
@@ -165,7 +165,7 @@ function makePopup(d) {
 
 	// update the highlight color dropdown
 	var select = document.getElementById('highlight_select');
-	select.childNodes.forEach(function(option) {
+	Array.prototype.slice.call(select.childNodes).forEach(function(option) {
 		if (option.tagName == 'OPTION') {
 			if (option.value == d.highlight) {
 				option.selected = true;

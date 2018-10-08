@@ -116,7 +116,7 @@ def set_reading_times_to_be_those_that_a_word_was_highlighted(sess):
 		data = json.loads(data)
 
 	reading_times = [float(x) for x in data.keys()]
-	reading_times.sort()
+	reading_times.sort(reverse=True)
 
 # global variables
 sess = None

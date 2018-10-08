@@ -68,13 +68,60 @@ def compare_counts(h_counts1, h_counts2):
 		output += abs(h_counts1[k] - h_counts2[k])
 	return output
 
+def set_reading_times_with_most_highlight_changes(sess):
+	global reading_times
+
+	# get the reading times
+	# if already saved and sorted, load
+	if os.path.isfile(sess.dir_name + os.sep + 'sorted_reading_times.json'):
+		with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'r') as infile:
+			data = ' '.join([line for line in infile])
+			data = json.loads(data)
+		reading_times = data['reading_times']
+		keys = data['keys']
+	# otherwise read from metadata and sort acording to highlights changed
+	else:
+		reading_times = [t for x in sess.metadata for t in x.get('transitions', []) if x['part'] == 'digital reading']
+		# sort according to number of changed highlights
+		highlight_counts = [get_num_highlights(t) for t in reading_times]
+		highlight_keys = [0] + [compare_counts(highlight_counts[i], highlight_counts[i-1]) for i in range(1, len(highlight_counts))]
+		keys_and_times = list(zip(highlight_keys, reading_times))
+		keys_and_times.sort(reverse = True)
+		reading_times = [pair[1] for pair in keys_and_times]
+		keys = [pair[0] for pair in keys_and_times]
+		# save the sorted times to a file so next time we don't have to calculate it again
+		with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'w') as outfile:
+			json.dump({'reading_times':reading_times, 'keys':keys}, outfile)
+
+	# only look at reading times where the key is greater than 0
+	new_reading_times = []
+	for i in range(len(reading_times)):
+		if keys[i] == 0:
+			break
+		new_reading_times.append(reading_times[i])
+	reading_times = new_reading_times
+
+# review found highlights
+def set_reading_times_to_be_those_that_a_word_was_highlighted(sess):
+	global reading_times
+
+	if not os.path.isfile(sess.dir_name + os.sep + 'highlighting_report.json'):
+		reading_times = []
+
+	with open(sess.dir_name + os.sep + 'highlighting_report.json', 'r') as infile:
+		data = ' '.join([line for line in infile])
+		data = json.loads(data)
+
+	reading_times = [float(x) for x in data.keys()]
+	reading_times.sort()
+
 # global variables
 sess = None
 editor_folder = ''
 reading_times = None
 reading_index = 0
 edit_start_time = None
-source_dirs = ['highlight-no-ids', 'highlight-no-correction']
+source_dirs = ['with-highlights']
 source_dir_index = 0
 
 @app.route('/')
@@ -92,7 +139,7 @@ def home():
 
 @app.route('/set_session', methods=['POST'])
 def set_session():
-	global editor_folder, sess, reading_times, reading_index
+	global editor_folder, sess, reading_index
 	if request.method == 'POST':
 		editor = request.form['editor'] + '_edits'
 		sess_name = request.form['session']
@@ -103,36 +150,11 @@ def set_session():
 		editor_folder = sess.dir_name + os.sep + editor
 		if not os.path.isdir(editor_folder):
 			os.mkdir(editor_folder)
-
-		# get the reading times
-		# if already saved and sorted, load
-		if os.path.isfile(sess.dir_name + os.sep + 'sorted_reading_times.json'):
-			with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'r') as infile:
-				data = ' '.join([line for line in infile])
-				data = json.loads(data)
-			reading_times = data['reading_times']
-			keys = data['keys']
-		# otherwise read from metadata and sort acording to highlights changed
-		else:
-			reading_times = [t for x in sess.metadata for t in x.get('transitions', []) if x['part'] == 'digital reading']
-			# sort according to number of changed highlights
-			highlight_counts = [get_num_highlights(t) for t in reading_times]
-			highlight_keys = [0] + [compare_counts(highlight_counts[i], highlight_counts[i-1]) for i in range(1, len(highlight_counts))]
-			keys_and_times = list(zip(highlight_keys, reading_times))
-			keys_and_times.sort(reverse = True)
-			reading_times = [pair[1] for pair in keys_and_times]
-			keys = [pair[0] for pair in keys_and_times]
-			# save the sorted times to a file so next time we don't have to calculate it again
-			with open(sess.dir_name + os.sep + 'sorted_reading_times.json', 'w') as outfile:
-				json.dump({'reading_times':reading_times, 'keys':keys}, outfile)
-
-		# only look at reading times where the key is greater than 0
-		new_reading_times = []
-		for i in range(len(reading_times)):
-			if keys[i] == 0:
-				break
-			new_reading_times.append(reading_times[i])
-		reading_times = new_reading_times
+		
+		# set the reading times to be all times that have highlight changes
+		set_reading_times_to_be_those_that_a_word_was_highlighted(sess)
+		if len(reading_times) == 0:
+			return redirect('/')
 
 		# set the index
 		reading_index = 0

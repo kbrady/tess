@@ -245,6 +245,8 @@ def time_to_filename(current_time, extension='jpg'):
 
 # from a filename calculate the timestamp
 def filename_to_time(filename):
+	# get rid of folder names
+	filename = filename.split(os.sep)[-1]
 	parts = filename.split('.')
 	minutes, seconds = [int(x) for x in parts[0].split('-')]
 	if len(parts) > 2:

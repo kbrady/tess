@@ -6,7 +6,7 @@ import os
 # to look in the right places
 import settings
 # to get the session info
-from video_to_frames import Session, get_session_names, time_to_filename
+from video_to_frames import Session, get_session_names, time_to_filename, filename_to_time
 # get each document
 from ocr_cleanup import get_documents
 # to measure how long each session is taking
@@ -173,18 +173,16 @@ def find_highlights_for_each_session(no_bolding=False, img_dir_path=settings.fra
 
 # make a report of when highlights were made and editted
 def make_report(sess, part='digital reading'):
-	# get the times for this session
-	reading_times = [x for x in sess.metadata if x['part'] == part]
-	reading_times = [t for reading_interval in reading_times for t in reading_interval['transitions']]
-	reading_times.sort()
+	# get the documents for this session
+	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part)
+	times_and_documents = [(filename_to_time(doc.input_file), doc) for doc in documents]
+	times_and_documents.sort()
 	report = defaultdict(list)
 	# keep track of the current state of each word
 	# assume the starting color is white
 	current_state = defaultdict(lambda:'white')
-	dir_path = sess.dir_name + os.sep + settings.highlights_dir + os.sep
-	for t in reading_times:
+	for doc_time, doc in times_and_documents:
 		new_highlight_ids = {}
-		doc = Document(dir_path + time_to_filename(t, extension='hocr'))
 		words = [w for l in doc.lines for w in l.children if 'highlight' in w.attrs]
 		for w in words:
 			# if there is no global id, skip
@@ -192,21 +190,44 @@ def make_report(sess, part='digital reading'):
 				continue
 			# treat each global id as different
 			id_group = [int(x) for x in w.attrs['global_ids'].split(' ')]
+			# highlights only count if the color changed for all words
+			changed = True
 			for global_id in id_group:
-				# this is the case where we record stuff
-				if w.attrs['highlight'] != current_state[global_id]:
-					# don't count white to light blue since we get a lot of false possitives here
-					# THIS IS HARD CODED SHOULD FIX
-					if w.attrs['highlight'] == 'light blue' and current_state[global_id] == 'white':
-						continue
-					report[t].append({
-						'id':global_id,
-						'text':str(w),
-						'id_group':id_group,
-						'color':w.attrs['highlight'],
-						'former color':current_state[global_id]})
+				# if any word in the id group was already this color, no highlight is measured
+				if w.attrs['highlight'] == current_state[global_id]:
+					changed = False
+			# this is the case where we record stuff
+			if changed:
+				report[doc_time].append({
+					'id':global_id,
+					'text':str(w),
+					'id_group':id_group,
+					'color':w.attrs['highlight'],
+					'former colors':[current_state[global_id] for global_id in id_group]})
+				for global_id in id_group:
 					current_state[global_id] = w.attrs['highlight']
 	return report
 
+def get_highlighting_report_for_each_session(part='digital reading', redo=False):
+	# get the session names
+	session_names = get_session_names()
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		# avoid sessions where the corrections have not been completely calculated
+		if not os.path.isfile(sess.dir_name + os.sep + 'time_to_find_highlights.json'):
+			continue
+		# don't recalculate
+		if not redo and os.path.isfile(sess.dir_name + os.sep + 'time_to_make_highlight_report.json'):
+			continue
+		time_to_find_highlights = {}
+		t0 = time.time()
+		report = make_report(sess, part=part)
+		with open(sess.dir_name + os.sep + 'highlighting_report.json', 'w') as fp:
+			json.dump(report, fp)
+		time_to_find_highlights['make_report'] = time.time() - t0
+		with open(sess.dir_name + os.sep + 'time_to_make_highlight_report.json', 'w') as fp:
+			json.dump(time_to_find_highlights, fp)
+
 if __name__ == '__main__':
 	find_highlights_for_each_session()
+	get_highlighting_report_for_each_session()

@@ -247,8 +247,8 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 		plt.xlabel('Time Since Session Started')
 		plt.ylabel('Vertical Position of Screen')
 	# fix x ticks
-	x_tick_vals = plt.xticks()[0]
-	x_tick_vals_unscaled = [unscale_x(x) for x in x_tick_vals if x <= max_width]
+	x_tick_vals = [x for x in plt.xticks()[0] if x <= max_width]
+	x_tick_vals_unscaled = [unscale_x(x) for x in x_tick_vals]
 	num_to_str = lambda num: str(int(num)) if num >= 10 else '0'+str(int(num))
 	to_time_str = lambda t: num_to_str(int(t/60)) + ':' + num_to_str(t-(int(t/60)*60))
 	plt.xticks(x_tick_vals, [to_time_str(xt) for xt in x_tick_vals_unscaled])

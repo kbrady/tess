@@ -13,7 +13,7 @@ import subprocess
 # to save the amount of time things take
 import json
 
-def make_ocr_ready_images(sess, redo=False, part='digital reading'):
+def make_ocr_ready_images(sess, redo=False, part='digital reading', cutoff_parts=True):
 	reading_times = [x for x in sess.metadata if x['part'] == part]
 	for reading_interval in reading_times:
 		for image_time in reading_interval['transitions']:
@@ -26,16 +26,19 @@ def make_ocr_ready_images(sess, redo=False, part='digital reading'):
 			if not os.path.isdir(dir_for_bigger_images):
 				os.mkdir(dir_for_bigger_images)
 			full_path_for_new_image = dir_for_bigger_images + os.sep + filename
-			resize_image(full_path, full_path_for_new_image, redo=redo, part=part)
+			resize_image(full_path, full_path_for_new_image, redo=redo, part=part, cutoff_parts=cutoff_parts)
 
 def resize_dir(origin_dir, resized_dir, redo=False):
 	for filename in os.listdir(origin_dir):
 		resize_image(origin_dir + os.sep + filename, resized_dir + os.sep + filename, redo=redo)
 
-def resize_image(original_path, resized_path, redo=False, part='digital reading'):
+def resize_image(original_path, resized_path, redo=False, part='digital reading', cutoff_parts=True):
 	if not redo and os.path.isfile(resized_path):
 		return
-	pic = get_part_of_picture(original_path, x_range=settings.x_range[part], y_range=settings.y_range[part])
+	if cutoff_parts:
+		pic = get_part_of_picture(original_path, x_range=settings.x_range[part], y_range=settings.y_range[part])
+	else:
+		pic = get_part_of_picture(original_path, x_range=None, y_range=None)
 	bigger_pic = ndimage.zoom(pic, (2, 2, 1), order=0)
 	misc.imsave(resized_path, bigger_pic)
 
@@ -68,10 +71,10 @@ def run_tesseract_on_dir(picture_dir, hocr_dir, redo=False):
 		run_tesseract_on_image(image_path, hocr_path)
 
 # run all parts of run inital ocr and time them on each session
-def run_initial_ocr_and_time(sess, part='digital reading'):
+def run_initial_ocr_and_time(sess, part='digital reading', cutoff_parts=True):
 	time_to_build = {}
 	t0 = time.time()
-	make_ocr_ready_images(sess, redo=True, part=part)
+	make_ocr_ready_images(sess, redo=True, part=part, cutoff_parts=cutoff_parts)
 	time_to_build['make_ocr_ready_images'] = time.time() - t0
 	t0 = time.time()
 	run_tesseract(sess, redo=True, part=part)
@@ -79,16 +82,16 @@ def run_initial_ocr_and_time(sess, part='digital reading'):
 	time_to_build['find_digital_reading_transitions'] = time.time() - t0
 	return time_to_build
 
-def run_initial_ocr_and_time_on_each_session(redo=False):
+def run_initial_ocr_and_time_on_each_session(redo=False, cutoff_parts=True):
 	session_names = get_session_names()
 	for sess_name in session_names:
 		sess = Session(sess_name)
 		if not redo and os.path.isfile(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json'):
 			continue
-		time_to_build = run_initial_ocr_and_time(sess)
+		time_to_build = run_initial_ocr_and_time(sess, cutoff_parts=cutoff_parts)
 		with open(sess.dir_name + os.sep + 'time_to_run_initial_ocr.json', 'w') as fp:
 			json.dump(time_to_build, fp)
 
 if __name__ == '__main__':
-	run_initial_ocr_and_time_on_each_session()
+	run_initial_ocr_and_time_on_each_session(cutoff_parts=False)
 

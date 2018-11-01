@@ -75,7 +75,7 @@ class Document(XML_META):
 			if len(w) < 2:
 				continue
 			for doc in word_to_doc[w]:
-				evidence[doc] += np.log(len(w))
+				evidence[doc] += len(w)
 		if testing:
 			document_sets = [word_to_doc[w] for w in bag_of_words]
 			with open('document_counts.csv', 'w') as outputfile:
@@ -365,14 +365,14 @@ class Document(XML_META):
 				raise Exception('No totally correct lines found')
 
 	# function to make all corrections 
-	def fix(self, right_shift=None, down_shift=None, stop_at_lines=False):
+	def fix(self, right_shift=None, down_shift=None, scale=True, stop_at_lines=False):
 		self.assign_lines()
 		if not stop_at_lines:
 			self.calc_char_width()
 			for l in self.lines:
 				pairing = l.find_pairing()
 				l.assign_words(pairing)
-		if right_shift is not None:
+		if scale:
 			self.scale(right_shift, down_shift, 0.5)
 
 	def scale(self, right_shift, down_shift, multiple):

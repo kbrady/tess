@@ -3,7 +3,7 @@ import os
 # to look in the right places
 import settings
 # to get the session info
-from video_to_frames import Session, get_session_names, time_to_filename
+from video_to_frames import Session, get_session_names, time_to_filename, filename_to_time
 # to measure how long each session is taking
 import time
 # to calculate the standard deviation of dimensions
@@ -36,14 +36,14 @@ def make_matching_dictionary(correct_bags):
 
 # this function takes a set of documents and the
 # correct documents they matched to and fixes then saves them
-def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=None, down_shift=None, stop_at_lines=False, alt_dir_name=None):
+def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=None, down_shift=None, scale=True, stop_at_lines=False, alt_dir_name=None):
 	for doc_index in range(len(doc_list)):
 		correct_filename = doc_index_to_filename_fun(doc_index)
 		doc = doc_list[doc_index]
 		doc.assign_correct_bag(correct_filename, correct_bags[correct_filename])
 		# we want to have the option to just find matching lines and save to other filenames
 		try:
-			doc.fix(right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines)
+			doc.fix(right_shift=right_shift, down_shift=down_shift, scale=scale, stop_at_lines=stop_at_lines)
 		except Exception as e:
 			doc.attrs['raised_error'] = 'Raised error while being fixed in cleanup_docs'
 		doc.save(alt_dir_name=alt_dir_name)
@@ -66,13 +66,13 @@ def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', s
 		filepath = dir_name + os.sep + filename
 		# don't re-calculate already finished files
 		if not redo:
-			alt_dir_name = alt_dir_name if alt_dir_name is not None else settings.xml_dir
+			alt_dir_name = alt_dir_name if alt_dir_name is not None else source_dir_name
 			xml_path = sess.dir_name + os.sep + alt_dir_name + os.sep + filename
 			if os.path.isfile(xml_path):
 				continue
 		# check to make sure the filepath is a valid document
 		try:
-			doc = Document(filepath, output_dir=alt_dir_name, output_dir_relative=True)
+			doc = Document(filepath, output_dir=alt_dir_name, output_dir_relative=True, time_in_seconds=filename_to_time(filepath))
 		except Exception as e:
 			bad_filepaths.append(filepath)
 		documents.append(doc)
@@ -101,11 +101,12 @@ def find_best_matching_correct_doc(documents, word_to_doc):
 	return lambda x : best_match
 
 # do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False, scale=True, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
 	# time this action
 	time_to_cleanup = {}
 	t0 = time.time()
 	# get the documents to correct
+	alt_dir_name = alt_dir_name if alt_dir_name is not None else settings.xml_dir
 	documents = get_documents(sess, redo=redo, alt_dir_name=alt_dir_name, part=part)
 	time_to_cleanup['get_documents'] = time.time() - t0
 	# if there are no documents to correct we are done
@@ -119,7 +120,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, stop_at_lines=F
 	t0 = time.time()
 	right_shift = settings.x_range[part][0]
 	down_shift = settings.y_range[part][0]
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, right_shift=right_shift, down_shift=down_shift, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, right_shift=right_shift, down_shift=down_shift, scale=scale, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
 	time_to_cleanup['cleanup_docs'] = time.time() - t0
 	return time_to_cleanup
 
@@ -136,7 +137,7 @@ def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_do
 		mapping[i] = documents[i].find_correct(word_to_doc)
 	doc_index_to_filename_fun = lambda x : mapping[x]
 	# cleanup all the documents
-	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, alt_dir_name=alt_dir_name)
+	cleanup_docs(documents, correct_bags, doc_index_to_filename_fun, stop_at_lines=stop_at_lines, scale=scale, alt_dir_name=alt_dir_name)
 
 def scale_docs(sess, dir_to_save=None, part='typing'):
 	# need the session directory path to all the documents
@@ -151,8 +152,9 @@ def scale_docs(sess, dir_to_save=None, part='typing'):
 		if filename.endswith('.hocr'):
 			documents.append(Document(filepath, output_dir=dir_to_save))
 	# scale to correct size
-	right_shift = settings.x_range[part][0]
-	down_shift = settings.y_range[part][0]
+	if settings.x_range[part][0] is not None:
+		right_shift = settings.x_range[part][0]
+		down_shift = settings.y_range[part][0]
 	# save documents
 	for doc in documents:
 		doc.scale(right_shift, down_shift, 0.5)

@@ -11,7 +11,7 @@ import ocr_cleanup
 # to read in xml files
 import pair_screen_with_eyes
 # to get the session info
-from video_to_frames import Session
+from video_to_frames import Session, get_session_names
 # to store values
 from collections import defaultdict
 # to investigate distributions
@@ -207,7 +207,7 @@ def plot_heatmap(bins, dst_img_path, output_path, parts=4):
 	plt.savefig(output_path, dpi=800)
 
 # visualize scrolling
-def get_scroll(sess, xml_dir_extention=None):
+def get_scroll(sess, xml_dir_extention=None, start_time=None, end_time=None):
 	# get the corpus
 	corpus = pair_screen_with_eyes.Corpus(sess, xml_dir_extention=xml_dir_extention)
 	if len(corpus.documents) == 0:
@@ -224,13 +224,23 @@ def get_scroll(sess, xml_dir_extention=None):
 		_, y_top = mapping_function(500, settings.y_range['digital reading'][0])
 		_, y_bottom = mapping_function(500, settings.y_range['digital reading'][1])
 		data.append((t,y_top, y_bottom))
+	if start_time is not None and len(data) > 0 and data[0][0] < start_time:
+		before_start_time = [x for x in data if x[0] <= start_time]
+		first_val = max(before_start_time, key=lambda x:x[0])
+		first_val = (start_time, first_val[1], first_val[2])
+		data = [first_val] + [x for x in data if x[0] > start_time]
+	if end_time is not None and len(data) > 0 and data[-1][0] > end_time:
+		after_end_time = [x for x in data if x[0] >= end_time]
+		last_val = min(after_end_time, key=lambda x:x[0])
+		last_val = (end_time, last_val[1], last_val[2])
+		data = [x for x in data if x[0] > end_time] + [last_val]
 	return data, correct_doc
 
-def plot_scroll(sess, xml_dir_extention=None):
+def plot_scroll(sess, xml_dir_extention=None, start_time=None, end_time=None, reset_time=False, filename='scrolling.png'):
 	# make sure there is nothing still in the figure
 	plt.cla()
 	# get the scrolling data
-	data, correct_doc = get_scroll(sess, xml_dir_extention=xml_dir_extention)
+	data, correct_doc = get_scroll(sess, xml_dir_extention=xml_dir_extention, start_time=start_time, end_time=end_time)
 	if len(data) == 0:
 		return
 	# expand the data to cover the full time period for each frame
@@ -254,13 +264,16 @@ def plot_scroll(sess, xml_dir_extention=None):
 	plt.ylim([height, 0])
 	# fix x ticks
 	x_tick_vals = plt.xticks()[0]
-	x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals))+min(x_vals) for x in x_tick_vals]
+	if reset_time:
+		x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals)) for x in x_tick_vals]
+	else:
+		x_tick_vals_unscaled = [x/width*(max(x_vals)-min(x_vals))+min(x_vals) for x in x_tick_vals]
 	num_to_str = lambda num: str(int(num)) if num >= 10 else '0'+str(int(num))
-	to_time_str = lambda t: num_to_str(int(t)/60) + ':' + num_to_str(t-((int(t)/60)*60))
+	to_time_str = lambda t: num_to_str(int(t/60)) + ':' + num_to_str(t-((int(t)/60)*60))
 	plt.xticks(x_tick_vals, [to_time_str(xt) for xt in x_tick_vals_unscaled])
 	# get rid of y ticks
 	plt.yticks([], [])
-	plt.savefig(sess.dir_name + os.sep + 'scrolling.png', dpi=800)
+	plt.savefig(sess.dir_name + os.sep + filename, dpi=800)
 
 # visualize dwell time as a heatmap
 def get_dwell_area(sess, xml_dir_extention=None):
@@ -311,13 +324,12 @@ def plot_dwell_heatmap(sess, xml_dir_extention=None):
 	plt.savefig(sess.dir_name + os.sep + 'dwell_heatmap.png', dpi=800)
 
 if __name__ == '__main__':
-	# some session ids from the pilot data
-	session_even_names = ['second_student_participant', 'sixth_participant'] # 'eighth_participant', 'fourth-participant-second-version', 
-	session_odd_names = ['fifth_participant', 'first_student_participant_second_take','seventh_participant', 'third_student_participant']
 
-	for sess_name in session_even_names + session_odd_names:
+
+	for sess_name in get_session_names():
 		print(sess_name)
 		sess = Session(sess_name)
+		plot_scroll(sess, xml_dir_extention=None, start_time=None, end_time=None, reset_time=False, filename='scrolling.png')
 		if not os.path.isdir(sess.dir_name + os.sep + 'hocr-files'):
 			print('no hocr')
 			continue

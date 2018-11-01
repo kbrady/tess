@@ -86,6 +86,9 @@ class Session:
 		while current_time < duration:
 			self.screen_time_to_picture(current_time)
 			current_time += chunk_size_in_seconds
+		# missing frames by the end is not acceptable
+		current_time = duration
+		self.screen_time_to_picture(current_time)
 
 	# figure out which part of the stimuli the current frame belongs to
 	# this uses a lot of hard coded methods of assessing whether the part is the same
@@ -308,7 +311,8 @@ def get_part_of_picture(image_path, x_range, y_range):
 	pic = np.array(misc.imread(image_path))
 	# cut off the top and bottom parts of the frame which show the address bar and the dock
 	# cut off the right part of the frame which may be showing the note taking menu (not important for the moment)
-	pic = pic[y_range[0]:y_range[1], x_range[0]:x_range[1], :]
+	if x_range is not None:
+		pic = pic[y_range[0]:y_range[1], x_range[0]:x_range[1], :]
 	return pic
 
 # this is used for the ffmpeg commands and filenames
@@ -348,7 +352,7 @@ def build_session(screen_recording_path):
 
 def get_session_names(from_videos=False):
 	if not from_videos:
-		return list(os.listdir(settings.data_dir))
+		return [x for x in os.listdir(settings.data_dir) if not x.startswith('.')]
 	sess_paths = get_session_paths(settings.raw_dir)
 	return [sess_path_to_name(x) for x in sess_paths]
 
@@ -376,13 +380,16 @@ def get_session_paths(dir_path, recursive=True):
 	return paths
 
 # build all the sessions
-def build_all_sessions():
+def build_all_sessions(redo=False):
 	if not os.path.isdir(settings.data_dir):
 		os.mkdir(settings.data_dir)
 	# get session paths
 	sess_paths = get_session_paths(settings.raw_dir)
 	# build sessions
 	for screen_recording_path in sess_paths:
+		sess_name = sess_path_to_name(screen_recording_path)
+		if os.path.isfile(settings.data_dir + sess_name + os.sep + 'time_to_build_sess.json'):
+			continue
 		time_to_build, sess_name = build_session(screen_recording_path)
 		with open(settings.data_dir + sess_name + os.sep + 'time_to_build_sess.json', 'w') as fp:
 			json.dump(time_to_build, fp)

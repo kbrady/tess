@@ -259,7 +259,7 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 	plt.clf()
 
 if __name__ == '__main__':
-	#save_scrolling_for_all_sessions()
+	save_scrolling_for_all_sessions()
 	for sess_name in get_session_names():
 		sess = Session(sess_name)
 		# rows = stitch_lines(sess, redo=True)

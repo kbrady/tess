@@ -36,7 +36,7 @@ def make_matching_dictionary(correct_bags):
 
 # this function takes a set of documents and the
 # correct documents they matched to and fixes then saves them
-def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=None, down_shift=None, scale=True, stop_at_lines=False, alt_dir_name=None):
+def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=None, down_shift=None, scale=0.5, stop_at_lines=False, alt_dir_name=None):
 	for doc_index in range(len(doc_list)):
 		correct_filename = doc_index_to_filename_fun(doc_index)
 		doc = doc_list[doc_index]
@@ -73,9 +73,9 @@ def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', s
 		# check to make sure the filepath is a valid document
 		try:
 			doc = Document(filepath, output_dir=alt_dir_name, output_dir_relative=True, time_in_seconds=filename_to_time(filepath))
+			documents.append(doc)
 		except Exception as e:
 			bad_filepaths.append(filepath)
-		documents.append(doc)
 	# get rid of any documents which don't have lines
 	# print(out how many of these there are)
 	have_lines = [d for d in documents if (len(d.lines) > 0 and 'raised_error' not in d.attrs)]
@@ -101,7 +101,7 @@ def find_best_matching_correct_doc(documents, word_to_doc):
 	return lambda x : best_match
 
 # do the cleanup and save for a whole session
-def cleanup_session(sess, correct_bags, word_to_doc, redo=False, scale=True, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
+def cleanup_session(sess, correct_bags, word_to_doc, redo=False, scale=0.5, stop_at_lines=False, alt_dir_name=None, part='digital reading'):
 	# time this action
 	time_to_cleanup = {}
 	t0 = time.time()
@@ -124,7 +124,7 @@ def cleanup_session(sess, correct_bags, word_to_doc, redo=False, scale=True, sto
 	time_to_cleanup['cleanup_docs'] = time.time() - t0
 	return time_to_cleanup
 
-def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=True, stop_at_lines=False, alt_dir_name=None):
+def cleanup_hocr_files(input_dir_path, output_dir_path, correct_bags, word_to_doc, scale=0.5, stop_at_lines=False, alt_dir_name=None):
 	# get the documents in this directory
 	documents = []
 	for filename in os.listdir(input_dir_path):
@@ -152,9 +152,10 @@ def scale_docs(sess, dir_to_save=None, part='typing'):
 		if filename.endswith('.hocr'):
 			documents.append(Document(filepath, output_dir=dir_to_save))
 	# scale to correct size
-	if settings.x_range[part][0] is not None:
-		right_shift = settings.x_range[part][0]
-		down_shift = settings.y_range[part][0]
+	right_shift = settings.x_range[part][0]
+	down_shift = settings.y_range[part][0]
+	right_shift = 0 if right_shift is None else right_shift
+	down_shift = 0 if down_shift is None else down_shift
 	# save documents
 	for doc in documents:
 		doc.scale(right_shift, down_shift, 0.5)

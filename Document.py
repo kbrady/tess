@@ -365,15 +365,16 @@ class Document(XML_META):
 				raise Exception('No totally correct lines found')
 
 	# function to make all corrections 
-	def fix(self, right_shift=None, down_shift=None, scale=True, stop_at_lines=False):
+	def fix(self, right_shift=None, down_shift=None, scale=0.5, stop_at_lines=False):
 		self.assign_lines()
 		if not stop_at_lines:
 			self.calc_char_width()
 			for l in self.lines:
 				pairing = l.find_pairing()
 				l.assign_words(pairing)
-		if scale:
-			self.scale(right_shift, down_shift, 0.5)
+		right_shift = 0 if right_shift is None else right_shift
+		down_shift = 0 if down_shift is None else down_shift
+		self.scale(right_shift, down_shift, scale)
 
 	def scale(self, right_shift, down_shift, multiple):
 		for l in self.lines:

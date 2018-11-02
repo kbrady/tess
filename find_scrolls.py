@@ -172,7 +172,7 @@ def calculate_scrolling(sess, part='digital reading', redo=False, save=True, inc
 			frame_filepath = sess.dir_name + os.sep + settings.frame_images_dir + os.sep + time_to_filename(t)
 			img = np.array(misc.imread(frame_filepath))
 			# not unscalling properly right now
-			bottom_value = img.shape[0] * 2
+			bottom_value = img.shape[0]
 			top_value = 0
 		mapping_function = get_mapping_function(sess, doc, static_line_list, include_low_confidence=include_low_confidence)
 		y_top = mapping_function(top_value)

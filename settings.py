@@ -12,9 +12,13 @@ hocr_dir = 'hocr-files'
 xml_dir = 'xml-files'
 global_id_dir = 'with-id-files'
 highlights_dir = 'with-highlights'
-correct_text_dir = 'correct_text/synthesized_reading'
 error_dir = 'error-docs'
 mapping_dir = 'mapping_dir'
+viz_explanation_frames = 'viz-explanation-frames'
+
+# directories for correction and vizs
+stitched_img_directory = 'parts_for_viz/synthasized'
+correct_text_dir = 'correct_text/synthesized_reading'
 
 # ranges for various parts of the stimuli
 x_range = {
@@ -34,9 +38,12 @@ eye_tracking_mapped_csv_file = 'mapped_values.csv'
 
 # visualization files
 scrolling_viz_file = 'scrolling.jpg'
+highlighting_image_file = 'highlighting_image.jpg'
+highlighting_viz_file = 'highlighting.jpg'
 
 # json files
 stitched_together_json_file = 'stitched.json'
+highlighting_report = 'highlighting_report.json'
 
 # a value for heatmaps
 pixels_per_bin = 100

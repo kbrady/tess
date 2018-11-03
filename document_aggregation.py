@@ -102,7 +102,15 @@ def find_assignment_with_backtracking(words_and_assignments, mapping, max_possib
 		unassigned_indexes = new_unassigned_indexes
 	return words_and_assignments
 
-def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir):
+def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_from_scratch=False):
+	print(start_from_scratch)
+	if start_from_scratch:
+		# delete the existing global ids
+		word_series = [word for line in doc.lines for word in line.children]
+		for word in word_series:
+			if 'global_ids' not in word.attrs:
+				continue
+			del word.attrs['global_ids']
 	word_series = [word for line in doc.lines for word in line.children if len(str(word)) > 0]
 	# loop through the words until all are matched
 	unassigned_words = [w for w in word_series if 'global_ids' not in w.attrs]
@@ -146,8 +154,8 @@ def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir):
 	doc.save()
 
 # use the correct file to assign global ids
-def assign_global_ids_from_correct_file(sess, part='digital reading', redo=False, error_dir=settings.error_dir):
-	documents = get_documents(sess, source_dir_name=settings.xml_dir, alt_dir_name = settings.global_id_dir)
+def assign_global_ids_from_correct_file(sess, part='digital reading', redo=False, error_dir=settings.error_dir, source_dir_name=settings.xml_dir, alt_dir_name=settings.global_id_dir, edit_dir=None, start_from_scratch=False):
+	documents = get_documents(sess, redo=True, source_dir_name=source_dir_name, alt_dir_name = alt_dir_name, edit_dir=edit_dir)
 	if len(documents) == 0:
 		return
 	mapping = get_word_to_id_assignment(settings.correct_text_dir + os.sep + documents[0].attrs['filename'])
@@ -156,7 +164,7 @@ def assign_global_ids_from_correct_file(sess, part='digital reading', redo=False
 		if not redo:
 			if os.path.isfile(doc.output_file):
 				continue
-		assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir)
+		assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_from_scratch=start_from_scratch)
 
 def assign_global_ids_to_each_session(redo=False, part='digital reading', error_dir=settings.error_dir):
 	# get the session names
@@ -176,5 +184,14 @@ def assign_global_ids_to_each_session(redo=False, part='digital reading', error_
 		with open(sess.dir_name + os.sep + 'time_to_assign_ids.json', 'w') as fp:
 			json.dump(time_to_assign_ids, fp)
 
+# reasign global ids based on the new text assigned during interactive editting
+def assign_global_ids_to_corrected_files_for_each_session():
+	# get the session names
+	session_names = get_session_names()
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		# assign the global ids
+		assign_global_ids_from_correct_file(sess, part='digital reading', redo=True, error_dir=settings.error_dir, source_dir_name=settings.editor_dir, alt_dir_name=settings.editor_dir, start_from_scratch=True)
+
 if __name__ == '__main__':
-	assign_global_ids_to_each_session()
+	assign_global_ids_to_corrected_files_for_each_session()

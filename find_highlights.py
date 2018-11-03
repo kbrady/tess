@@ -26,6 +26,8 @@ from matplotlib import image as mpimg
 import json
 # if thresholding is bad
 from sklearn.cluster import KMeans
+# to save numpy arrays as images
+from PIL import Image
 
 # convert image to grayscale (weight RGB acording to human eye)
 def rgb2gray(rgb):
@@ -114,14 +116,6 @@ def find_highlight_color(word, img, no_bolding = False):
 	img_segment = img[sub_three(top):add_three(bottom, height), sub_three(left):add_three(right, width), :]
 	if (img_segment.size < 9):
 		return
-		# print(right, left, top, bottom)
-		# print(word)
-		# print(word.attrs)
-		# print(img_segment.shape)
-		# print(img.shape)
-		# print([(sub_three(top), add_three(bottom, height)), (sub_three(left),	add_three(right, width))])
-		# mpimg.imsave('tmp.jpg', img_segment)
-		# print('Image too small')
 	# get the colors associated with this word
 	background_col, foreground_col, background_perc = seperate_image(img_segment)
 	# get the label for this word
@@ -174,7 +168,7 @@ def find_highlights_for_each_session(no_bolding=False, img_dir_path=settings.fra
 # make a report of when highlights were made and editted
 def make_report(sess, part='digital reading'):
 	# get the documents for this session
-	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part)
+	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part, edit_dir=settings.editor_dir)
 	times_and_documents = [(filename_to_time(doc.input_file), doc) for doc in documents]
 	times_and_documents.sort()
 	report = defaultdict(list)
@@ -208,7 +202,8 @@ def make_report(sess, part='digital reading'):
 					current_state[global_id] = w.attrs['highlight']
 	return report
 
-def get_highlighting_report_for_each_session(part='digital reading', redo=False):
+# save the highlighting report to for each session
+def make_highlighting_report_for_each_session(part='digital reading', redo=False):
 	# get the session names
 	session_names = get_session_names()
 	for sess_name in session_names:
@@ -222,12 +217,200 @@ def get_highlighting_report_for_each_session(part='digital reading', redo=False)
 		time_to_find_highlights = {}
 		t0 = time.time()
 		report = make_report(sess, part=part)
-		with open(sess.dir_name + os.sep + 'highlighting_report.json', 'w') as fp:
+		with open(sess.dir_name + os.sep + settings.highlighting_report, 'w') as fp:
 			json.dump(report, fp)
 		time_to_find_highlights['make_report'] = time.time() - t0
 		with open(sess.dir_name + os.sep + 'time_to_make_highlight_report.json', 'w') as fp:
 			json.dump(time_to_find_highlights, fp)
 
+# get the lengths of all words in the files
+# keep track of previously calculated files
+word_lengths_by_filename = {}
+# calculate word lengths if they have not been previously calculated
+# otherwise, return the word lengths that was stored
+def get_word_lengths(filename):
+	if filename not in word_lengths_by_filename:
+		correct_doc_path = settings.correct_text_dir + os.sep + filename
+		with open(correct_doc_path, 'r') as infile:
+			text = ' '.join([line for line in infile])
+			word_lengths_by_filename[filename] = [len(w) for w in text.split(' ') if len(w) > 0]
+	return word_lengths_by_filename[filename]
+
+# get the highlighting report for a user
+def get_user_data(sess):
+    with open(sess.dir_name + os.sep + settings.highlighting_report, 'r') as infile:
+        data = json.loads(' '.join([line for line in infile]))
+    return data
+
+# get the color of a word at a time
+def get_color(time, word_id, mapping, min_time):
+	# if the pair is in the mapping return, the relavent value
+	if (time, word_id) in mapping:
+		return mapping[(time, word_id)]
+	# initalize all words to white (unless mentioned in the mapping at min_time)
+	if time <= min_time:
+			return 'white'
+	# if the pair is not in the mapping now, find the word color at a previous time
+	try:
+		val = get_color(time - 1, word_id, mapping, min_time)
+	# figure out what is going wrong if the base case isn't being caught
+	except RecursionError as e:
+		print(time)
+		print(word_id)
+		raise e
+	# save the value to the mapping so the recursion stack is shallow for future calls
+	mapping[(time, word_id)] = val
+	return val
+
+# visualizing highlighting behavior over time as a matrix
+# each pixel on the Y axis represents a time window of size t
+# each pixel on the X asis represents a character in the article (spaces are not represented)
+def get_highlight_visualization_matrix(sess, part='digital reading', redo=False):
+	# load from image if not redoing and it exists
+	if not redo and os.path.isfile(sess.dir_name + os.sep + settings.highlighting_image_file):
+		return np.array(Image.open(sess.dir_name + os.sep + settings.highlighting_image_file))
+
+	# get the largest reading time
+	# (in the future it might be good to make multiple visualizations)
+	reading_times = max([x for x in sess.metadata if x['part'] == part], key=lambda x: max(x['transitions']) - min(x['transitions']))
+	reading_times = reading_times['transitions']
+
+	if len(reading_times) == 0:
+		return
+
+	# get a sample document to find the correction document
+	dir_name = sess.dir_name + os.sep + settings.highlights_dir
+	sample_doc_path = dir_name + os.sep + time_to_filename(reading_times[0], extension='hocr')
+	sample_doc = Document(sample_doc_path, output_dir=None)
+	correction_filename = sample_doc.correct_filepath.split(os.sep)[-1]
+
+	# get the lengths of all words
+	word_lengths = get_word_lengths(correction_filename)
+	total_word_length = sum(word_lengths)
+	
+	# get highlighting report
+	data = get_user_data(sess)
+
+	# calculate mapping from (time, word) -> color
+	min_time = int(min(reading_times)/settings.little_t)
+	max_time = int(max(reading_times)/settings.little_t)
+	mapping = {}
+	for time in data:
+		for word_obj in data[time]:
+			for w_id in word_obj['id_group']:
+				mapping[(int(float(time) * 10), int(w_id))] = word_obj['color']
+	
+	# the output image (initalize to zeros)
+	# this helps catch bugs as long as black is not one of the highlight colors
+	matrix = np.zeros(((max_time - min_time), total_word_length, 3), 'uint8')
+	
+	for row in range((max_time - min_time)):
+		for word_id in range(len(word_lengths)):
+			color_string = get_color(row + min_time, word_id, mapping, min_time)
+			# get the pixel start and end of a word
+			word_start = 0 if word_id == 0 else sum(word_lengths[:word_id])
+			word_end = word_start + word_lengths[word_id] + 1
+			for i in range(3):
+				matrix[row, word_start:word_end, i] = settings.highlight_viz_colors[color_string][i]
+
+	# save for future calls
+	img = Image.fromarray(matrix).convert('RGB')
+	img.save(sess.dir_name + os.sep + settings.highlighting_image_file)
+	
+	# return the image
+	return matrix
+
+# make a highlighting image for each session
+def make_highlighting_images(part='digital reading', redo=False):
+	session_names = get_session_names()
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		# avoid sessions where there is no highlighting report
+		if not os.path.isfile(sess.dir_name + os.sep + settings.highlighting_report):
+			continue
+		# don't recalculate
+		if not redo and os.path.isfile(sess.dir_name + os.sep + 'time_to_make_highlight_image.json'):
+			continue
+		time_to_make_matrix = {}
+		t0 = time.time()
+		get_highlight_visualization_matrix(sess, part=part, redo=redo)
+		time_to_make_matrix['make_matrix'] = time.time() - t0
+		with open(sess.dir_name + os.sep + 'time_to_make_highlight_image.json', 'w') as fp:
+			json.dump(time_to_make_matrix, fp)
+
+# get a list of the words in the correct file to label the image with
+word_labels_by_filename = {}
+def get_word_labels(filename):
+	if filename not in word_labels_by_filename:
+		correct_doc_path = settings.correct_text_dir + os.sep + filename
+		with open(correct_doc_path, 'r') as infile:
+			text = ' '.join([line for line in infile])
+			word_labels_by_filename[filename] = [w for w in text.split(' ') if len(w) > 0]
+	return word_labels_by_filename[filename]
+
+# make a visualization (highlight image + axis)
+def make_highlight_viz(sess, words_per_label=3, part='digital reading', save_and_clear=True, include_labels=True):
+	matrix = get_highlight_visualization_matrix(sess, part=part)
+	max_height, max_width, _ = matrix.shape
+	plt.imshow(matrix)
+
+	# set the x ticks (words)
+	# get the largest reading time
+	# (in the future it might be good to make multiple visualizations)
+	reading_times = max([x for x in sess.metadata if x['part'] == part], key=lambda x: max(x['transitions']) - min(x['transitions']))
+	reading_times = reading_times['transitions']
+
+	if len(reading_times) == 0:
+		return
+
+	# get a sample document to find the correction document
+	dir_name = sess.dir_name + os.sep + settings.highlights_dir
+	sample_doc_path = dir_name + os.sep + time_to_filename(reading_times[0], extension='hocr')
+	sample_doc = Document(sample_doc_path, output_dir=None)
+	correction_filename = sample_doc.correct_filepath.split(os.sep)[-1]
+
+	# get the word labels
+	word_labels = get_word_labels(correction_filename)
+	# map the pixel values to words to get the labels
+	word_lengths = [len(w) for w in word_labels]
+	char_index_to_word_index_mapping = {}
+	word_index = 0
+	for char_index in range(sum(word_lengths)):
+		if sum(word_lengths[:(word_index+1)]) < char_index:
+			word_index += 1
+		char_index_to_word_index_mapping[char_index] = word_index
+
+	x_tick_vals = [x for x in plt.xticks()[0] if (x >= 0) and (x <= max_width)]
+	x_tick_labels = []
+	for x_tick in x_tick_vals:
+		word_index = char_index_to_word_index_mapping[x_tick]
+		last_index = min([word_index + words_per_label, len(word_labels)])
+		x_tick_labels.append(' '.join(word_labels[word_index:last_index]))
+	plt.xticks(x_tick_vals, x_tick_labels, rotation=15, fontsize=5)
+
+	# set the y ticks (time)
+	y_tick_vals = [y for y in plt.yticks()[0] if (y >= 0) and (y <= max_height)]
+	num_to_str = lambda num: str(int(num)) if num >= 10 else '0'+str(int(num))
+	to_time_str = lambda t: num_to_str(int(t/60)) + ':' + num_to_str(t-(int(t/60)*60))
+	plt.yticks(y_tick_vals, [to_time_str(yt*settings.little_t) for yt in y_tick_vals])
+
+	if include_labels:
+		plt.xlabel('Article Text')
+		plt.ylabel('Time')
+
+	if save_and_clear:
+		plt.savefig(sess.dir_name + os.sep + settings.highlighting_viz_file, dpi=800)
+		plt.clf()
+
+def make_highlighting_viz_for_all_sessions(part='digital reading'):
+	session_names = get_session_names()
+	for sess_name in session_names:
+		sess = Session(sess_name)
+		# make a visualization
+		make_highlight_viz(sess, part=part)
+
 if __name__ == '__main__':
-	find_highlights_for_each_session()
-	get_highlighting_report_for_each_session()
+	# find_highlights_for_each_session()
+	make_highlighting_report_for_each_session(redo=True)
+	make_highlighting_images(redo=True)
+	make_highlighting_viz_for_all_sessions()

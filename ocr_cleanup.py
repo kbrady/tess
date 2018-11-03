@@ -49,9 +49,11 @@ def cleanup_docs(doc_list, correct_bags, doc_index_to_filename_fun, right_shift=
 		doc.save(alt_dir_name=alt_dir_name)
 
 # get the documents for a whole session
-def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', source_dir_name=settings.hocr_dir):
+def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', source_dir_name=settings.hocr_dir, edit_dir=None):
 	# need the session directory path to all the documents
 	dir_name = sess.dir_name + os.sep + source_dir_name
+	if edit_dir is not None:
+		edit_dir_name = sess.dir_name + os.sep + edit_dir
 	# if there are no hocr files to clean, we should move on
 	if not os.path.isdir(dir_name):
 		return []
@@ -63,7 +65,10 @@ def get_documents(sess, redo=False, alt_dir_name=None, part='digital reading', s
 	bad_filepaths = []
 	for time in reading_times:
 		filename = time_to_filename(time, extension='hocr')
-		filepath = dir_name + os.sep + filename
+		if edit_dir is not None and os.path.isfile(edit_dir_name + os.sep + filename):
+			filepath = edit_dir_name + os.sep + filename
+		else:
+			filepath = dir_name + os.sep + filename
 		# don't re-calculate already finished files
 		if not redo:
 			alt_dir_name = alt_dir_name if alt_dir_name is not None else source_dir_name

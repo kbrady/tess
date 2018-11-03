@@ -48,6 +48,21 @@ function makeLegend() {
 	});
 }
 
+function change_all_to_white() {
+	hidePopup();
+	Array.prototype.slice.call(wordInfo).forEach(function(word) {
+		var word_id = word.global_ids;
+		var text = word.text;
+		var color = 'white';
+
+		changes[word_id] = [text, color];
+		// get rid of the old bbox and replace with correct color word
+		removeWord(word);
+		updateWord(word_id, text, color);
+	});
+	changes_container.value = JSON.stringify(changes);
+}
+
 function recordChanges() {
 	var word_id = document.getElementById('global_ids_input').value;
 	var text = document.getElementById('text_input').value;
@@ -96,6 +111,7 @@ function addWord(d) {
 		.style('fill-opacity', 0)
 		.style('stroke-opacity', 1)
 		.style('stroke-width', 1.5)
+		.attr('data', d.global_ids)
 		.on('click', function(e) {makePopup(d);});
 
 	// Write text

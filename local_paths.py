@@ -8,6 +8,8 @@ data_dir = '/tess/data/'
 
 # highlight colors
 highlight_colors = {'dark blue':(71,148,241), 'yellow':(253, 250, 193), 'light blue':(213, 242, 254), 'white':(245, 245, 245), 'black':(90,90,90)}
+highlight_viz_colors = highlight_colors.copy()
+highlight_viz_colors['white'] = (255, 255, 255)
 highlight_color_pairs = {
 	'dark blue': (highlight_colors['white'], highlight_colors['dark blue']),
 	'light blue':(highlight_colors['light blue'], highlight_colors['black']),
@@ -15,9 +17,12 @@ highlight_color_pairs = {
 	'white':(highlight_colors['white'], highlight_colors['black'])
 }
 
+# edittor to use
+editor_dir = 'Kate_edits'
+
 # # values for splitting videos
-# big_t = 1
-# little_t = .1
+big_t = 1
+little_t = .1
 
 # functions for disecting videos
 # need to fix this function

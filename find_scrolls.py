@@ -195,7 +195,7 @@ def save_scrolling_for_all_sessions(part='digital reading'):
 		calculate_scrolling(sess, part=part, redo=True)
 
 # visualize scrolling from a session
-def visualize_scrolling(sess, part='digital reading', picture_directory = None, include_labels=True):
+def visualize_scrolling(sess, part='digital reading', picture_directory = None, include_labels=True, save_and_clear=True):
 	# get the scrolling data
 	data = list(calculate_scrolling(sess, part=part).apply(lambda x: (x['Time'], x['Top'], x['Bottom']), axis=1))
 	if len(data) == 0:
@@ -243,6 +243,8 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 		plt.ylim([max_height, 0])
 		# plot data on top
 		plt.fill_between(x_vals, y_top_vals, y_bottom_vals, alpha=.2)
+
+	# add the labels
 	if include_labels:
 		plt.xlabel('Time Since Session Started')
 		plt.ylabel('Vertical Position of Screen')
@@ -254,9 +256,11 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 	plt.xticks(x_tick_vals, [to_time_str(xt) for xt in x_tick_vals_unscaled])
 	# get rid of y ticks
 	plt.yticks([], [])
-	plt.savefig(sess.dir_name + os.sep + settings.scrolling_viz_file, dpi=800)
-	# make sure there is nothing still in the figure
-	plt.clf()
+
+	if save_and_clear:
+		plt.savefig(sess.dir_name + os.sep + settings.scrolling_viz_file, dpi=800)
+		# make sure there is nothing still in the figure
+		plt.clf()
 
 if __name__ == '__main__':
 	save_scrolling_for_all_sessions()

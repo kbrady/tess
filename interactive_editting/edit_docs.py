@@ -4,6 +4,8 @@ sys.path.append('..')
 from Document import Document
 from local_paths import highlight_color_pairs
 from video_to_frames import time_to_filename, Session, filename_to_time
+# to score reading times
+from ocr_cleanup import get_documents
 import json
 from matplotlib import image as mpimg
 from flask import Flask, render_template, url_for, request, redirect
@@ -15,7 +17,7 @@ from collections import Counter
 app = Flask(__name__)
 
 def sess_name_to_id(sess_name):
-	return sess_name.split('Scene_')[1].split('_Website')[0]
+	return sess_name #.split('Scene_')[1].split('_Website')[0]
 
 def word_to_json(word, index):
 	output = {}
@@ -118,6 +120,29 @@ def set_reading_times_to_be_those_that_a_word_was_highlighted(sess):
 	reading_times = [float(x) for x in data.keys()]
 	reading_times.sort(reverse=True)
 
+def set_reading_times(sess):
+	global reading_times
+
+	# windows = [(184, 185), (166.5, 168)]
+	# # get the largest reading time
+	# # (in the future it might be good to make multiple visualizations)
+	# transitions = max([x for x in sess.metadata if x['part'] == 'digital reading'], key=lambda x: max(x['transitions']) - min(x['transitions']))
+	# transitions = transitions['transitions']
+
+	# reading_times = []
+	# for t in transitions:
+	# 	for min_time, max_time in windows:
+	# 		if (min_time <= t) and (t <= max_time):
+	# 			reading_times.append(t)
+
+	reading_times = []
+
+	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part='digital reading', edit_dir=settings.editor_dir)
+	for doc in documents:
+		non_white_words = [w for l in doc.lines for w in l.children if (w.attrs.get('highlight', 'white') in ['light blue', 'dark blue']) and (w.attrs.get('global_ids', [-1]) != [-1])]
+		if len(non_white_words) > 0:
+			reading_times.append(doc.time)
+
 # global variables
 sess = None
 editor_folder = ''
@@ -131,7 +156,6 @@ source_dir_index = 0
 def home():
 	sess_names = []
 	sess_list = os.listdir(settings.data_dir)
-	sess_list.sort(key=lambda x: 0 if x == 'Amanda' else 1)
 	for folder_name in sess_list:
 		if folder_name.startswith('.'):
 			continue
@@ -147,7 +171,7 @@ def set_session():
 		editor = request.form['editor'] + '_edits'
 		sess_name = request.form['session']
 		sess = Session(sess_name)
-		continue_from_last = request.form['continue_from_last']
+		continue_from_last = request.form.get('continue_from_last', False)
 
 		# make the folder to save the editted files in
 		editor_folder = sess.dir_name + os.sep + editor
@@ -155,7 +179,7 @@ def set_session():
 			os.mkdir(editor_folder)
 		
 		# set the reading times to be all times that have highlight changes
-		set_reading_times_to_be_those_that_a_word_was_highlighted(sess)
+		set_reading_times(sess)
 		if len(reading_times) == 0:
 			return redirect('/')
 
@@ -187,6 +211,7 @@ def edit_doc():
 			return redirect('/')
 		reading_index = index
 	print('reading_index', reading_index)
+	print('reading_time', reading_times[reading_index])
 	edit_start_time = time.time()
 	filetime = reading_times[reading_index]
 	# display the already editted document if it exists

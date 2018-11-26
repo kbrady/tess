@@ -181,5 +181,9 @@ def run_cleanup_session_and_time_on_each_session(redo=False, part='digital readi
 			json.dump(time_to_cleanup, fp)
 
 if __name__ == '__main__':
-	run_cleanup_session_and_time_on_each_session()
+	run_cleanup_session_and_time_on_each_session(redo=True)
+	# correct_bags = get_correct_bags()
+	# word_to_doc = make_matching_dictionary(correct_bags)
+	# cleanup_hocr_files('data/digital_reading_1/hocr-files', 'data/digital_reading_1/xml-files', correct_bags, word_to_doc, scale=1, stop_at_lines=False, alt_dir_name=None)
+	# cleanup_hocr_files('data/digital_reading_2/hocr-files', 'data/digital_reading_2/xml-files', correct_bags, word_to_doc, scale=1, stop_at_lines=False, alt_dir_name=None)
 	

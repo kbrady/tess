@@ -103,7 +103,6 @@ def find_assignment_with_backtracking(words_and_assignments, mapping, max_possib
 	return words_and_assignments
 
 def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_from_scratch=False):
-	print(start_from_scratch)
 	if start_from_scratch:
 		# delete the existing global ids
 		word_series = [word for line in doc.lines for word in line.children]
@@ -111,7 +110,10 @@ def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_
 			if 'global_ids' not in word.attrs:
 				continue
 			del word.attrs['global_ids']
-	word_series = [word for line in doc.lines for word in line.children if len(str(word)) > 0]
+	# sort first so the lines are in the right order (this will not just happen)
+	all_lines = doc.lines.copy()
+	all_lines.sort(key=lambda l: l.title['bbox'].top)
+	word_series = [word for line in all_lines for word in line.children if len(str(word)) > 0]
 	# loop through the words until all are matched
 	unassigned_words = [w for w in word_series if 'global_ids' not in w.attrs]
 	while len(unassigned_words) > 0:
@@ -194,4 +196,4 @@ def assign_global_ids_to_corrected_files_for_each_session():
 		assign_global_ids_from_correct_file(sess, part='digital reading', redo=True, error_dir=settings.error_dir, source_dir_name=settings.editor_dir, alt_dir_name=settings.editor_dir, start_from_scratch=True)
 
 if __name__ == '__main__':
-	assign_global_ids_to_corrected_files_for_each_session()
+	assign_global_ids_to_each_session()

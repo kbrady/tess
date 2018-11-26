@@ -7,13 +7,22 @@ raw_dir = '/videos'
 data_dir = '/tess/data/'
 
 # highlight colors
-highlight_colors = {'dark blue':(71,148,241), 'yellow':(253, 250, 193), 'light blue':(213, 242, 254), 'white':(245, 245, 245), 'black':(90,90,90)}
+highlight_colors = {
+	'dark blue':(71,148,241),
+	'purple':(73,112,210),
+	'yellow':(253, 250, 193),
+	'light blue':(213, 242, 254),
+	'white':(245, 245, 245),
+	'black':(10,10,10),
+	'mustard yellow':(244, 174, 77)}
 highlight_viz_colors = highlight_colors.copy()
 highlight_viz_colors['white'] = (255, 255, 255)
 highlight_color_pairs = {
 	'dark blue': (highlight_colors['white'], highlight_colors['dark blue']),
 	'light blue':(highlight_colors['light blue'], highlight_colors['black']),
 	'yellow':(highlight_colors['yellow'], highlight_colors['black']),
+	'mustard yellow':(highlight_colors['white'], highlight_colors['mustard yellow']),
+	'dark on dark':(highlight_colors['black'], highlight_colors['purple']),
 	'white':(highlight_colors['white'], highlight_colors['black'])
 }
 

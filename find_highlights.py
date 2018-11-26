@@ -61,7 +61,7 @@ def cluster_img(img):
 	return labels.reshape((h, w)) == 0
 
 # seperate an image into light and dark colors and take the median of each color set
-def seperate_image(img, method=threshold_img):
+def seperate_image(img, method=cluster_img):
 	flat_image = rgb2gray(img)
 	# get the boolean array that seperates text from the background
 	light = method(img)
@@ -398,6 +398,9 @@ def make_highlight_viz(sess, words_per_label=3, part='digital reading', save_and
 		plt.xlabel('Article Text')
 		plt.ylabel('Time')
 
+	# add space for labels and tick marks
+	plt.tight_layout()
+
 	if save_and_clear:
 		plt.savefig(sess.dir_name + os.sep + settings.highlighting_viz_file, dpi=800)
 		plt.clf()
@@ -410,7 +413,7 @@ def make_highlighting_viz_for_all_sessions(part='digital reading'):
 		make_highlight_viz(sess, part=part)
 
 if __name__ == '__main__':
-	# find_highlights_for_each_session()
-	make_highlighting_report_for_each_session(redo=True)
-	make_highlighting_images(redo=True)
-	make_highlighting_viz_for_all_sessions()
+	find_highlights_for_each_session()
+	# make_highlighting_report_for_each_session(redo=True)
+	# make_highlighting_images(redo=True)
+	# make_highlighting_viz_for_all_sessions()

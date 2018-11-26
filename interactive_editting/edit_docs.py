@@ -12,7 +12,7 @@ from flask import Flask, render_template, url_for, request, redirect
 import settings
 import time
 from random import randint
-from collections import Counter
+from collections import Counter, defaultdict
 
 app = Flask(__name__)
 
@@ -108,7 +108,7 @@ def set_reading_times_with_most_highlight_changes(sess):
 
 # review found highlights
 def set_reading_times_to_be_those_that_a_word_was_highlighted(sess):
-	global reading_times
+	global reading_times, highlight_data
 
 	if not os.path.isfile(sess.dir_name + os.sep + 'highlighting_report.json'):
 		reading_times = []
@@ -117,31 +117,39 @@ def set_reading_times_to_be_those_that_a_word_was_highlighted(sess):
 		data = ' '.join([line for line in infile])
 		data = json.loads(data)
 
-	reading_times = [float(x) for x in data.keys()]
-	reading_times.sort(reverse=True)
+	# record the highlights for each time so we can print and look for them
+	highlight_data = defaultdict(list)
+	reading_times = []
+	for k in data.keys():
+		highlight_data[float(k)] = [x for x in data[k] if x['id'] != -1]
+		reading_times.append(float(k))
+
+	reading_times.sort()
 
 def set_reading_times(sess):
 	global reading_times
 
-	# windows = [(184, 185), (166.5, 168)]
-	# # get the largest reading time
-	# # (in the future it might be good to make multiple visualizations)
-	# transitions = max([x for x in sess.metadata if x['part'] == 'digital reading'], key=lambda x: max(x['transitions']) - min(x['transitions']))
-	# transitions = transitions['transitions']
+	#set_reading_times_to_be_those_that_a_word_was_highlighted(sess)
 
-	# reading_times = []
-	# for t in transitions:
-	# 	for min_time, max_time in windows:
-	# 		if (min_time <= t) and (t <= max_time):
-	# 			reading_times.append(t)
+	windows = [(229.9, 230.6)]
+	# get the largest reading time
+	# (in the future it might be good to make multiple visualizations)
+	transitions = max([x for x in sess.metadata if x['part'] == 'digital reading'], key=lambda x: max(x['transitions']) - min(x['transitions']))
+	transitions = transitions['transitions']
 
 	reading_times = []
+	for t in transitions:
+		for min_time, max_time in windows:
+			if True: #(min_time <= t) and (t <= max_time):
+				reading_times.append(t)
 
-	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part='digital reading', edit_dir=settings.editor_dir)
-	for doc in documents:
-		non_white_words = [w for l in doc.lines for w in l.children if (w.attrs.get('highlight', 'white') in ['light blue', 'dark blue']) and (w.attrs.get('global_ids', [-1]) != [-1])]
-		if len(non_white_words) > 0:
-			reading_times.append(doc.time)
+	# reading_times = []
+
+	# documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part='digital reading', edit_dir=settings.editor_dir)
+	# for doc in documents:
+	# 	non_white_words = [w for l in doc.lines for w in l.children if (w.attrs.get('highlight', 'white') in ['light blue', 'dark blue']) and (w.attrs.get('global_ids', [-1]) != [-1])]
+	# 	if len(non_white_words) > 0:
+	# 		reading_times.append(doc.time)
 
 # global variables
 sess = None
@@ -149,8 +157,9 @@ editor_folder = ''
 reading_times = None
 reading_index = 0
 edit_start_time = None
-source_dirs = ['with-highlights']
+source_dirs = ['with-highlights-thresholding']
 source_dir_index = 0
+highlight_data = defaultdict(list)
 
 @app.route('/')
 def home():
@@ -212,6 +221,9 @@ def edit_doc():
 		reading_index = index
 	print('reading_index', reading_index)
 	print('reading_time', reading_times[reading_index])
+	print('highlights')
+	for l in highlight_data[reading_times[reading_index]]:
+		print(l)
 	edit_start_time = time.time()
 	filetime = reading_times[reading_index]
 	# display the already editted document if it exists

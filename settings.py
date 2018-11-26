@@ -37,9 +37,10 @@ scrolling_csv_file = 'scrolling.csv'
 eye_tracking_mapped_csv_file = 'mapped_values.csv'
 
 # visualization files
-scrolling_viz_file = 'scrolling.jpg'
-highlighting_image_file = 'highlighting_image.jpg'
-highlighting_viz_file = 'highlighting.jpg'
+scrolling_viz_file = 'scrolling.png'
+highlighting_image_file = 'highlighting_image.png'
+highlighting_viz_file = 'highlighting.png'
+explanation_video = 'viz_explanantion.mp4'
 
 # json files
 stitched_together_json_file = 'stitched.json'

@@ -352,7 +352,7 @@ def build_session(screen_recording_path):
 
 def get_session_names(from_videos=False):
 	if not from_videos:
-		return [x for x in os.listdir(settings.data_dir) if not x.startswith('.')]
+		return [x for x in os.listdir(settings.data_dir) if (not x.startswith('.')) and os.path.isdir(settings.data_dir + x)]
 	sess_paths = get_session_paths(settings.raw_dir)
 	return [sess_path_to_name(x) for x in sess_paths]
 

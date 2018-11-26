@@ -21,6 +21,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 # to save static line mapping
 import json
+# to load sample documents (and get correct filepaths)
+from Document import Document
 
 # get the lines in order
 def get_lines(example_doc):
@@ -216,23 +218,36 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 	max_height = max(y_bottom_vals)
 	# if there is a picture, load it and scale the image values
 	if picture_directory is not None:
+
 		# get the picture name
-		documents = get_documents(sess, redo=True, alt_dir_name=None, part=part, source_dir_name=settings.xml_dir)
+		first_reading_time = data[0][0]
+
+		# get a sample document to find the correction document
+		dir_name = sess.dir_name + os.sep + settings.highlights_dir
+		sample_doc_path = dir_name + os.sep + time_to_filename(first_reading_time, extension='hocr')
+		sample_doc = Document(sample_doc_path, output_dir=None)
+		correction_filename = sample_doc.correct_filepath.split(os.sep)[-1]
+
+		# get the picture associated with the correction document
 		picture_directory = picture_directory if picture_directory.endswith(os.sep) else picture_directory + os.sep
-		image_path = picture_directory + documents[0].attrs['filename'][:-len('.txt')] + '.png'
+		image_path = picture_directory + correction_filename[:-len('.txt')] + '.png'
 		img = np.array(misc.imread(image_path))
 		height, width, _ = img.shape
 		plt.imshow(img)
+
 		# scale the plot to fit over the image
 		plt.xlim([0, width])
 		max_width = width
 		plt.ylim([height, 0])
+
 		# save instructions for unscaling
 		unscale_x = lambda x: (x/width*(max(x_vals)-min(x_vals)))+min(x_vals)
+
 		# scale values
 		x_scaled_vals = [(x-min(x_vals))/(max(x_vals)-min(x_vals))*width for x in x_vals]
 		y_scaled_top_vals = [y/max_height*height for y in y_top_vals]
 		y_scaled_bottom_vals = [y/max_height*height for y in y_bottom_vals]
+
 		# plot data on top
 		plt.fill_between(x_scaled_vals, y_scaled_top_vals, y_scaled_bottom_vals, alpha=.2)
 	else:
@@ -263,7 +278,7 @@ def visualize_scrolling(sess, part='digital reading', picture_directory = None, 
 		plt.clf()
 
 if __name__ == '__main__':
-	save_scrolling_for_all_sessions()
+	# save_scrolling_for_all_sessions()
 	for sess_name in get_session_names():
 		sess = Session(sess_name)
 		# rows = stitch_lines(sess, redo=True)

@@ -63,6 +63,21 @@ function change_all_to_white() {
 	changes_container.value = JSON.stringify(changes);
 }
 
+function change_all_to_mustard() {
+	hidePopup();
+	Array.prototype.slice.call(wordInfo).forEach(function(word) {
+		var word_id = word.global_ids;
+		var text = word.text;
+		var color = 'mustard yellow';
+
+		changes[word_id] = [text, color];
+		// get rid of the old bbox and replace with correct color word
+		removeWord(word);
+		updateWord(word_id, text, color);
+	});
+	changes_container.value = JSON.stringify(changes);
+}
+
 function recordChanges() {
 	var word_id = document.getElementById('global_ids_input').value;
 	var text = document.getElementById('text_input').value;

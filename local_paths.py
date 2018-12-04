@@ -9,22 +9,39 @@ data_dir = '/tess/data/'
 # highlight colors
 highlight_colors = {
 	'dark blue':(71,148,241),
-	'purple':(73,112,210),
 	'yellow':(253, 250, 193),
 	'light blue':(213, 242, 254),
 	'white':(245, 245, 245),
-	'black':(10,10,10),
-	'mustard yellow':(244, 174, 77)}
+	'black':(10,10,10)}
 highlight_viz_colors = highlight_colors.copy()
 highlight_viz_colors['white'] = (255, 255, 255)
 highlight_color_pairs = {
 	'dark blue': (highlight_colors['white'], highlight_colors['dark blue']),
 	'light blue':(highlight_colors['light blue'], highlight_colors['black']),
 	'yellow':(highlight_colors['yellow'], highlight_colors['black']),
-	'mustard yellow':(highlight_colors['white'], highlight_colors['mustard yellow']),
-	'dark on dark':(highlight_colors['black'], highlight_colors['purple']),
 	'white':(highlight_colors['white'], highlight_colors['black'])
 }
+# def avg(x):
+# 	return sum([v for v in x])/len(x)
+
+# highlight_colors = {
+#   'white':(255, 255, 255),
+#   'black':(0,0,0),
+#   'yellow':(244, 174, 77),
+#   'light blue':(213, 242, 254),
+#   'purple':(73,112,210),
+#   'red':(255,0,0),
+#   'green':(0,255,0),
+#   'blue':(0,0,255)
+# }
+# highlight_viz_colors = highlight_colors.copy()
+
+# highlight_color_pairs = {}
+# for c1 in highlight_colors:
+# 	for c2 in highlight_colors:
+# 		if avg(highlight_colors[c1]) >= avg(highlight_colors[c2]):
+# 			continue
+# 		highlight_color_pairs[c1+' and '+c2] = (highlight_colors[c1], highlight_colors[c2])
 
 # edittor to use
 editor_dir = 'Kate_edits'

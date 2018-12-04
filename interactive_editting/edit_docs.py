@@ -157,7 +157,7 @@ editor_folder = ''
 reading_times = None
 reading_index = 0
 edit_start_time = None
-source_dirs = ['with-highlights-thresholding']
+source_dirs = ['with-highlights-clustering']
 source_dir_index = 0
 highlight_data = defaultdict(list)
 

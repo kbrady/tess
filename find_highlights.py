@@ -75,7 +75,9 @@ def seperate_image(img, method=cluster_img):
 
 # find the difference between two RGB values
 def find_color_difference(input_color, comp_color):
-	return np.sqrt(sum([(input_color[i] - comp_color[i]) ** 2 for i in range(3)]))
+	weights = [0.299, 0.587, 0.114]
+	#return np.sqrt(sum([(input_color[i] - comp_color[i]) ** 2 for i in range(3)]))
+	return sum([abs(input_color[i] - comp_color[i]) * weights[i] for i in range(3)])
 
 # find the closest color pair in the local_settings highlight_color_pairs list to
 # the median colors detected in an image
@@ -98,7 +100,7 @@ def find_closest_color(background_col, foreground_col, no_bolding = False):
 	return closest_color, swap
 
 # find the highlight color for a word
-def find_highlight_color(word, img, no_bolding = False):
+def find_highlight_color(word, img, no_bolding = False, include_border=True):
 	# get segment to investigate
 	right, left, top, bottom = word.title['bbox'].right, word.title['bbox'].left, word.title['bbox'].top, word.title['bbox'].bottom
 	right, left, top, bottom = int(right), int(left), int(top), int(bottom)
@@ -113,7 +115,10 @@ def find_highlight_color(word, img, no_bolding = False):
 	for val in [top, bottom]:
 		if val >= height:
 			return
-	img_segment = img[sub_three(top):add_three(bottom, height), sub_three(left):add_three(right, width), :]
+	if include_border:
+		img_segment = img[sub_three(top):add_three(bottom, height), sub_three(left):add_three(right, width), :]
+	else:
+		img_segment = img[top:bottom, left:right, :]
 	if (img_segment.size < 9):
 		return
 	# get the colors associated with this word
@@ -166,18 +171,25 @@ def find_highlights_for_each_session(no_bolding=False, img_dir_path=settings.fra
 			json.dump(time_to_find_highlights, fp)
 
 # make a report of when highlights were made and editted
-def make_report(sess, part='digital reading'):
+def make_report(sess, part='digital reading', use_edit_dir=True, default_color='white'):
 	# get the documents for this session
-	documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part, edit_dir=settings.editor_dir)
+	if use_edit_dir:
+		documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part, edit_dir=settings.editor_dir)
+	else:
+		documents = get_documents(sess, redo=True, alt_dir_name=settings.highlights_dir, source_dir_name=settings.highlights_dir, part=part)
 	times_and_documents = [(filename_to_time(doc.input_file), doc) for doc in documents]
 	times_and_documents.sort()
 	report = defaultdict(list)
 	# keep track of the current state of each word
 	# assume the starting color is white
-	current_state = defaultdict(lambda:'white')
+	current_state = defaultdict(lambda:default_color)
 	for doc_time, doc in times_and_documents:
 		new_highlight_ids = {}
 		words = [w for l in doc.lines for w in l.children if 'highlight' in w.attrs]
+		# check if most the words are not white, and throw those frames out
+		frac_non_default = len([w for w in words if w.attrs['highlight'] != default_color])/len(words)
+		if frac_non_default > .6:
+			continue
 		for w in words:
 			# if there is no global id, skip
 			if 'global_ids' not in w.attrs:
@@ -192,18 +204,21 @@ def make_report(sess, part='digital reading'):
 					changed = False
 			# this is the case where we record stuff
 			if changed:
-				report[doc_time].append({
-					'id':global_id,
-					'text':str(w),
-					'id_group':id_group,
-					'color':w.attrs['highlight'],
-					'former colors':[current_state[global_id] for global_id in id_group]})
+				# record for each id that is changing it's value
+				for global_id in id_group:
+					if w.attrs['highlight'] != current_state[global_id]:
+						report[doc_time].append({
+							'id':global_id,
+							'text':str(w),
+							'id_group':id_group,
+							'color':w.attrs['highlight'],
+							'former colors':[current_state[global_id] for global_id in id_group]})
 				for global_id in id_group:
 					current_state[global_id] = w.attrs['highlight']
 	return report
 
 # save the highlighting report to for each session
-def make_highlighting_report_for_each_session(part='digital reading', redo=False):
+def make_highlighting_report_for_each_session(part='digital reading', redo=False, use_edit_dir=True):
 	# get the session names
 	session_names = get_session_names()
 	for sess_name in session_names:
@@ -216,9 +231,9 @@ def make_highlighting_report_for_each_session(part='digital reading', redo=False
 			continue
 		time_to_find_highlights = {}
 		t0 = time.time()
-		report = make_report(sess, part=part)
+		report = make_report(sess, part=part, use_edit_dir=use_edit_dir)
 		with open(sess.dir_name + os.sep + settings.highlighting_report, 'w') as fp:
-			json.dump(report, fp)
+			json.dump(report, fp, indent=4, sort_keys=False)
 		time_to_find_highlights['make_report'] = time.time() - t0
 		with open(sess.dir_name + os.sep + 'time_to_make_highlight_report.json', 'w') as fp:
 			json.dump(time_to_find_highlights, fp)
@@ -243,13 +258,13 @@ def get_user_data(sess):
     return data
 
 # get the color of a word at a time
-def get_color(time, word_id, mapping, min_time):
+def get_color(time, word_id, mapping, min_time, default_color='white'):
 	# if the pair is in the mapping return, the relavent value
 	if (time, word_id) in mapping:
 		return mapping[(time, word_id)]
 	# initalize all words to white (unless mentioned in the mapping at min_time)
 	if time <= min_time:
-			return 'white'
+			return default_color
 	# if the pair is not in the mapping now, find the word color at a previous time
 	try:
 		val = get_color(time - 1, word_id, mapping, min_time)
@@ -413,7 +428,7 @@ def make_highlighting_viz_for_all_sessions(part='digital reading'):
 		make_highlight_viz(sess, part=part)
 
 if __name__ == '__main__':
-	find_highlights_for_each_session()
-	# make_highlighting_report_for_each_session(redo=True)
+	# find_highlights_for_each_session()
+	make_highlighting_report_for_each_session(redo=True, use_edit_dir=False)
 	# make_highlighting_images(redo=True)
 	# make_highlighting_viz_for_all_sessions()

@@ -102,6 +102,12 @@ def find_assignment_with_backtracking(words_and_assignments, mapping, max_possib
 		unassigned_indexes = new_unassigned_indexes
 	return words_and_assignments
 
+def get_word_pos(word, line_heights):
+	height = (word.title['bbox'].bottom + word.title['bbox'].top)/2
+	height = min(line_heights, key=lambda x: abs(x-height))
+	width = (word.title['bbox'].left + word.title['bbox'].right)/2
+	return (height, width)
+
 def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_from_scratch=False):
 	if start_from_scratch:
 		# delete the existing global ids
@@ -110,10 +116,20 @@ def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_
 			if 'global_ids' not in word.attrs:
 				continue
 			del word.attrs['global_ids']
-	# sort first so the lines are in the right order (this will not just happen)
-	all_lines = doc.lines.copy()
-	all_lines.sort(key=lambda l: l.title['bbox'].top)
-	word_series = [word for line in all_lines for word in line.children if len(str(word)) > 0]
+	# get the words
+	word_series = [word for line in doc.lines for word in line.children if len(str(word).strip()) > 0]
+	# sort so the lines are in the right order (this will not just happen)
+	# sort the words correctly
+	line_heights = [(l.title['bbox'].bottom - l.title['bbox'].top) for l in doc.lines if len(str(l)) > 0]
+	avg_line_height = np.median(line_heights)
+	line_pos = [(l.title['bbox'].bottom + l.title['bbox'].top)/2 for l in doc.lines if len(str(l)) > 0]
+	line_pos.sort()
+	# filter out lines that are too close together
+	filtered_line_pos = []
+	for lp in line_pos:
+		if len(filtered_line_pos) == 0 or ((lp - filtered_line_pos[-1]) >= avg_line_height * .5):
+			filtered_line_pos.append(lp)
+	word_series.sort(key=lambda x: get_word_pos(x, filtered_line_pos))
 	# loop through the words until all are matched
 	unassigned_words = [w for w in word_series if 'global_ids' not in w.attrs]
 	while len(unassigned_words) > 0:
@@ -127,14 +143,14 @@ def assign_global_ids_to_doc(doc, mapping, max_possible_value, error_dir, start_
 			lower_bound = max(assigned_lower_ids) if len(assigned_lower_ids) > 0 else -1
 			upper_bound = min(assigned_upper_ids) if len(assigned_upper_ids) > 0 else max_possible_value+1
 			# break the word text into snippets
-			snippets = str(word_series[i]).split(' ')
+			snippets = str(word_series[i]).strip().split(' ')
 			for snippet_index in range(len(snippets)):
-				possible_values = [g_id for g_id in mapping[snippets[snippet_index]] if lower_bound < g_id and upper_bound > g_id]
+				possible_values = [g_id for g_id in mapping[snippets[snippet_index]] if (lower_bound < g_id) and (upper_bound > g_id)]
 				if len(possible_values) == 0:
 					word_series[i].attrs['global_ids'] = [-1]
 					word_series[i].attrs['error'] = 'probably'
 					doc.save(alt_dir_name=error_dir)
-					print('No ids found for {} in {}'.format(snippets[snippet_index], str(doc.find_title_attribute('image'))))
+					print('No ids found for "{}" in {}, mapping:{}, lower_bound:{}, upper_bound:{}'.format(snippets[snippet_index], str(doc.find_title_attribute('image')), mapping[snippets[snippet_index]], lower_bound, upper_bound))
 				if len(possible_values) == 1:
 					global_val = possible_values[0]
 					global_indexes = [global_val - snippet_index + x for x in range(len(snippets))]
@@ -196,4 +212,4 @@ def assign_global_ids_to_corrected_files_for_each_session():
 		assign_global_ids_from_correct_file(sess, part='digital reading', redo=True, error_dir=settings.error_dir, source_dir_name=settings.editor_dir, alt_dir_name=settings.editor_dir, start_from_scratch=True)
 
 if __name__ == '__main__':
-	assign_global_ids_to_each_session()
+	assign_global_ids_to_corrected_files_for_each_session()
